@@ -12,7 +12,7 @@ The name is 刻面 (_kèmiàn_), the gemology term for "facet": one body of know
 
 - **Make things work first.** The MVP ships as one package deployed to Cloudflare; the structure is refined once it runs.
 - **Configurable, not opinionated.** Levels, paths, frontmatter, instructions, and per-level filtering come from configuration and hooks, not hard-coded conventions.
-- **Privacy can't be configured off.** Hooks can drop files or change content, but nothing makes a bundle contain more than the markup allows.
+- **Privacy can't be configured off.** Hooks can only leave content out; nothing makes a bundle contain more than the markup allows.
 
 ## Concepts
 
@@ -59,7 +59,7 @@ Also in the repo:
 
 ### Effect
 
-The implementation uses [Effect](https://effect.website) v4: services and layers for the interfaces in `core`, typed errors for every failure path, and Effect Schema for the protocol.
+The implementation uses [Effect](https://effect.website) v4: typed errors for every failure path, Effect Schema for the protocol and the bundler's configuration, `effect/cli` for the CLI, and Effect's platform services for the bundler's file access.
 
 - **The public API is plain TypeScript.** Deployers configure Kemian with plain objects and functions returning Promises, and never need to write Effect.
 - **The extension API is Kemian's own** (see [Extension](#extension)), so the MCP library underneath can change without affecting deployers.
@@ -136,7 +136,7 @@ export default defineConfig({
 ```
 
 - Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns something unexpected drops the file too.
-- The CLI is `kemian check` and `kemian build` (to `dist/kemian/bundle-set.json`); both exit with code 1 when there are errors.
+- The CLI is `kemian check`, `kemian build` (to `dist/kemian/bundle-set.json`), and `kemian publish` (to a server's `/publish`, with the token from `KEMIAN_PUBLISH_TOKEN`); each exits with code 1 when there are errors.
 
 Worker (`apps/demo` is a complete example):
 
@@ -229,7 +229,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 | Lint            | Oxlint, type-aware                                             |
 | Format          | Oxfmt                                                          |
 | Tests           | Vitest 5 with `@effect/vitest`                                 |
-| Library build   | tsdown                                                         |
+| Library build   | tsdown for JavaScript, `tsc` for declarations                  |
 | Worker          | Vite with `@cloudflare/vite-plugin`, deployed with Wrangler    |
 | Git hooks       | lefthook                                                       |
 | CI              | GitHub Actions                                                 |
@@ -267,7 +267,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 
 Researched 2026-10-20 from search results and READMEs; the code wasn't read. Nothing found combines tiered access, inline privacy markup, and a generic bundle format.
 
-Read in depth before writing the server:
+Worth reading in depth (not done yet):
 
 - [cloudflare-mcp-for-static-sites](https://glama.ai/mcp/servers/@lennyzeltser/cloudflare-mcp-for-static-sites): builds a search index ahead of time, uploads it to R2, and serves it from a Worker with Fuse.js. The closest to the bundle design.
 - [Cloudflare's remote MCP server guide](https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/) and its GitHub OAuth template (`remote-mcp-github-oauth`): the login wiring. Its README calls it a demo that needs more security work for production.
