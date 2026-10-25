@@ -108,33 +108,33 @@ interface BundleSet {
 
 ## Privacy markup
 
-The markup the bundler implements:
+The full spec is [privacy-markup.md](privacy-markup.md). In short:
 
 - **Files and folders:** frontmatter `visibility: <level>` names the lowest level that may see a file. A folder's `README.md` sets the default for the folder, and the root defaults to the highest level.
-- **Blocks and inline spans:** a tag named after a level, e.g. `<private>…</private>`, marks content visible to that level and above, with optional `alt` (replacement text for lower levels) and `reason` attributes. The author's existing markup keeps working, and a new level adds a new tag. No nesting.
-- **Tags match in any case.** `<Private>` is markup, not text.
-- **Higher levels keep the tags** around content they may see, so agents at those levels know what is restricted. Configuration can turn this off. Content a level may not see is removed or replaced by its `alt`.
-- **Below the highest level,** HTML comments are removed, and frontmatter is removed from `content`; only allowlisted keys reach `meta`.
-- **Fails closed:** a file with malformed markup is left out of every bundle below the highest level, and `kemian check` reports it. `kemian publish` refuses to publish a build with errors, so the exclusion is a second layer.
+- **Blocks and inline spans:** a tag named after a level, e.g. `<private>…</private>`, marks content visible to that level and above, with optional `alt` and `reason` attributes. The author's existing markup keeps working, and a new level adds a new tag. Tags match in any case. No nesting.
+- **Higher levels keep the tags** around content they may see, so agents at those levels know what is restricted. Configuration can turn this off.
+- **Below the highest level,** HTML comments are removed. Frontmatter is never part of `content`; only the summary, title, update date, and allowlisted keys reach a bundle.
+- **Fails closed:** a file with malformed markup, frontmatter, or visibility, an unclosed HTML comment or code fence, or a link to something its level can't see is left out of every bundle below the highest level, and `kemian check` reports it. `kemian publish` refuses to publish a build with errors, so the exclusion is a second layer.
 
-The spec currently lives in the author's knowledge base and moves here, with invented examples, as the bundler's spec. TODO: move it to this repo. The author's `export-public.mjs` is the starting point for the bundler: its line-based parser is kept, and its fail-open holes are fixed (tag case, HTML comments, frontmatter, reference-style links).
+The bundler started from the author's `export-public.mjs`: its line-based parser is kept, generalized to any number of levels, and its fail-open holes are fixed (tag case, HTML comments, frontmatter, unclosed fences, reference-style and HTML links).
 
 ## Configuration
 
-Sketches; names are not final.
-
-Content repo, `kemian.config.ts` (loaded with Node's built-in TypeScript support):
+Content repo, `kemian.config.ts` (loaded with Node's built-in TypeScript support; `KemianConfig` in the `bundler` module documents every option):
 
 ```ts
 export default defineConfig({
   levels: ['public', 'private'], // lowest first; the root defaults to the highest
-  exclude: ['sources/**', 'inbox/**'],
-  frontmatter: { keep: ['summary', 'updated', 'status'] },
-  filter: ({ level, file }) => !(level === 'public' && file.frontmatter.status === 'draft'),
+  exclude: ['sources/**', '!sources/README.md'],
+  frontmatter: { keep: ['status'] },
+  filter: ({ level, frontmatter }) => level !== 'public' || frontmatter['status'] !== 'draft',
   instructions: { public: 'meta/public-instructions.md', private: 'AGENTS.md' },
-  url: (path) => `https://example.com/${path}`,
+  url: ({ path }) => `https://example.com/${path}`,
 });
 ```
+
+- Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns something unexpected drops the file too.
+- The CLI is `kemian check` and `kemian build` (to `dist/kemian/bundle-set.json`); both exit with code 1 when there are errors.
 
 Worker:
 
@@ -242,9 +242,9 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 
 - TODO: Which clients to support besides Claude and the chat widget. ChatGPT may need tools named `search` and `fetch` with specific shapes (unverified).
 - TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing.
-- TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast).
+- TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast). Line-based parsing doesn't recognize indented code blocks, so tags in them count as markup, which errs toward hiding.
 - TODO: Whether a logged-in identity that maps to no level sees nothing or falls back to the anonymous level.
-- TODO: Whether non-Markdown files (images, PDFs) are ever bundled.
+- TODO: Whether non-Markdown files (images, PDFs) are ever bundled. For now only Markdown is.
 
 ## Prior art
 

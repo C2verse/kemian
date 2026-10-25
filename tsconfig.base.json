@@ -27,6 +27,7 @@
           "unstableApiUsage": "off"
         }
       }
-    ]
+    ],
+    "erasableSyntaxOnly": true
   }
 }

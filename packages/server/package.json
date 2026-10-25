@@ -2,12 +2,22 @@
   "name": "@kemian/server",
   "version": "0.0.0",
   "description": "Serves one Markdown knowledge base to different audiences over MCP.",
+  "bin": {
+    "kemian": "./src/bundler/cli.ts"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
-    "./protocol": "./src/protocol/index.ts"
+    "./protocol": "./src/protocol/index.ts",
+    "./bundler": "./src/bundler/index.ts"
   },
   "dependencies": {
-    "effect": "4.0.6"
+    "@effect/platform-node": "4.0.6",
+    "effect": "4.0.6",
+    "picomatch": "4.0.7",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/picomatch": "4.0.3"
   }
 }

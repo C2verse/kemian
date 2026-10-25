@@ -13,14 +13,17 @@ Split failures into **expected errors** and **defects** (invariant violations).
 Define a `Schema.TaggedError` in the module that owns the domain, and fail with it in Effect's error channel by yielding it:
 
 ```ts
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 
 export class BundleNotFoundError extends Schema.TaggedError<
   BundleNotFoundError,
   { readonly brand: unique symbol }
 >()('BundleNotFoundError', { level: Schema.String }) {}
 
-return yield * new BundleNotFoundError({ level });
+const readBundle = (level: string) =>
+  Effect.gen(function* () {
+    return yield* new BundleNotFoundError({ level });
+  });
 ```
 
 - Handle or propagate errors deliberately; catch by tag (`Effect.catchTag`) at the boundary that can act on them.
