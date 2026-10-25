@@ -2,9 +2,18 @@
   "name": "@kemian/server",
   "version": "0.0.0",
   "description": "Serves one Markdown knowledge base to different audiences over MCP.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/C2verse/kemian.git",
+    "directory": "packages/server"
+  },
   "bin": {
     "kemian": "./src/bundler/cli.ts"
   },
+  "files": [
+    "dist",
+    "schema"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -12,7 +21,37 @@
     "./bundler": "./src/bundler/index.ts",
     "./core": "./src/core/index.ts",
     "./cloudflare": "./src/cloudflare/index.ts",
-    "./github": "./src/github/index.ts"
+    "./github": "./src/github/index.ts",
+    "./schema/*": "./schema/*"
+  },
+  "publishConfig": {
+    "bin": {
+      "kemian": "./dist/bundler/cli.js"
+    },
+    "exports": {
+      "./protocol": {
+        "types": "./dist/types/src/protocol/index.d.ts",
+        "default": "./dist/protocol/index.js"
+      },
+      "./bundler": {
+        "types": "./dist/types/src/bundler/index.d.ts",
+        "default": "./dist/bundler/index.js"
+      },
+      "./core": {
+        "types": "./dist/types/src/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "./cloudflare": {
+        "types": "./dist/types/src/cloudflare/index.d.ts",
+        "default": "./dist/cloudflare/index.js"
+      },
+      "./github": {
+        "types": "./dist/types/src/github/index.d.ts",
+        "default": "./dist/github/index.js"
+      },
+      "./schema/*": "./schema/*"
+    },
+    "access": "public"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "1.2.4",

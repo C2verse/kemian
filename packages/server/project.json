@@ -12,7 +12,18 @@
     },
     "test": {
       "command": "vitest run",
-      "options": { "cwd": "{projectRoot}" }
+      "options": {
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build": {
+      "command": "tsdown && tsc -p tsconfig.build.json",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"]
     }
   }
 }

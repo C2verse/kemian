@@ -1,6 +1,6 @@
 # Kemian design
 
-Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done, and M1 and M2 work locally; nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
+Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done; M1 and M2 work locally, and the package is ready to publish (M3) once a license is chosen. Nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
 
 ## Problem
 
@@ -235,6 +235,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 | CI              | GitHub Actions                                                 |
 
 - Vitest 5 rules out `@cloudflare/vitest-pool-workers`, which supports only Vitest 4. Modules are tested in Node with in-memory stores and the official MCP client; `apps/demo` runs end-to-end tests in local `workerd` through Wrangler's `createTestHarness`, publishing the fixture with the real CLI and reading it back over MCP.
+- tsdown can't emit declarations with TypeScript 7, which has no JS API, so `tsc` emits them. For the same reason `nx release`, which needs `@nx/js`, isn't used: releases are a manual pnpm version-and-publish for now.
 - Vite+ isn't used yet: its task runner duplicates Nx, and it pins tool versions the Cloudflare tooling doesn't support yet. It wraps the same tools, so switching later is cheap.
 
 ## Milestones
@@ -242,7 +243,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 - **M0, workspace:** the tooling above, coding conventions, CI, and the fixture knowledge base.
 - **M1, public MVP on Cloudflare:** the `protocol`, `bundler`, `core`, and `cloudflare` modules; the anonymous level only; `apps/demo` deployed to `workers.dev`. Done when Claude web, connected anonymously to the demo, answers from the fixture knowledge base. Everything but the deployment works and is tested locally.
 - **M2, private level:** the Workers OAuth Provider with GitHub login, `?access=<level>`, and the identity-to-level mapping. Works and is tested locally against a fake GitHub.
-- **M3, first real deployment:** publish `@kemian/server` 0.x with `nx release`; the author's content repo runs `kemian publish` in CI and the author deploys a Worker.
+- **M3, first real deployment:** publish `@kemian/server` 0.x; the author's content repo runs `kemian publish` in CI and the author deploys a Worker. The package builds and packs, and a test installs the packed result and runs it. TODO: choose a license, create the GitHub repo, and pick the Cloudflare account before publishing and deploying.
 - **M4, chat backend:** a chat module adding a `/chat` route.
 - **M5, template:** the template and Deploy button, then splitting modules into packages once their boundaries hold.
 
