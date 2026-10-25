@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.wrangler
+.dev.vars*
+
+/.nx/cache
+/.nx/workspace-data
+
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/extensions.json

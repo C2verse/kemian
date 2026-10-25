@@ -1,0 +1,15 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+allowBuilds:
+  lefthook: false
+  nx: true
+minimumReleaseAgeExclude:
+  - '@effect/tsgo-darwin-arm64@0.57.0'
+  - '@effect/tsgo-darwin-x64@0.57.0'
+  - '@effect/tsgo-linux-arm64@0.57.0'
+  - '@effect/tsgo-linux-arm@0.57.0'
+  - '@effect/tsgo-linux-x64@0.57.0'
+  - '@effect/tsgo-win32-arm64@0.57.0'
+  - '@effect/tsgo-win32-x64@0.57.0'
+  - '@effect/tsgo@0.57.0'

@@ -1,0 +1,13 @@
+{
+  "name": "@kemian/server",
+  "version": "0.0.0",
+  "description": "Serves one Markdown knowledge base to different audiences over MCP.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./protocol": "./src/protocol/index.ts"
+  },
+  "dependencies": {
+    "effect": "4.0.6"
+  }
+}

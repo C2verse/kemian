@@ -1,15 +1,16 @@
 # Kemian: instructions for AI agents
 
-Kemian serves one Markdown knowledge base to different audiences over MCP. Private content is marked inline, the bundler builds a redacted bundle per access level, and the server serves each caller only the bundle their credential maps to. Read [docs/design.md](docs/design.md) before any task: it holds the decisions, the open questions, and the build order.
+Kemian serves one Markdown knowledge base to different audiences over MCP. Private content is marked inline, the bundler builds a redacted bundle per access level, and the server serves each caller only the bundle their credential maps to. Read [docs/design.md](docs/design.md) before any task: it holds the decisions, the open questions, and the milestones.
 
 ## Rules
 
 - **The design doc is the source of truth.** When a decision is made or changed, update [docs/design.md](docs/design.md) in the same change. Record only decided facts; leave open questions as `TODO:`.
-- **One responsibility per package.** `@kemian/core` uses no platform or service APIs. Code for a specific service (Cloudflare, GitHub, …) goes in its own package behind an interface defined in core.
-- **`@kemian/protocol` is the contract.** Change it deliberately, with a version bump, and update every package that reads or writes bundles.
+- **One responsibility per module.** Everything ships in `@kemian/server`, split into modules under `packages/server/src/` that may become packages later. `core` uses no platform or service APIs. Code for a specific service (Cloudflare, GitHub, …) goes in its own module behind an interface defined in `core`. Oxlint enforces which modules may import which.
+- **The `protocol` module is the contract.** Change it deliberately: a breaking change increments the protocol version, and every module that reads or writes bundles is updated with it. The generated JSON Schema in `packages/server/schema/` is checked in; regenerate it with `pnpm exec vitest run -u` in `packages/server` only for intended changes.
 - **Privacy is structural.** Code that serves a caller receives only that caller's bundle, never the store or source. Redaction fails closed: when in doubt, leave content out.
-- **No real personal data in this repo.** Tests and examples use an invented fixture knowledge base.
+- **No real personal data in this repo.** Tests and examples use the invented knowledge base in `fixtures/knowledge-base/`.
 - **Commit messages** are lowercase sentences, e.g. "add bundle schema".
+- **Coding conventions** are in [.claude/rules/](.claude/rules/).
 
 ## The author's knowledge base
 
@@ -17,4 +18,17 @@ The first deployment is the author's personal knowledge base, a private repo at 
 
 ## Tooling
 
-TODO: package manager, build, test runner, and release process. Decide in the first implementation session and record them here.
+pnpm workspace on Node 24, orchestrated by Nx. Run commands from the repo root:
+
+```bash
+pnpm install                                  # also installs Git hooks and patches TypeScript and Oxlint for Effect
+pnpm exec nx run-many -t lint typecheck test  # everything; `pnpm check` for short
+pnpm exec nx test server                      # one target of one project
+pnpm exec oxfmt                               # format; `--check` to verify only
+```
+
+- **TypeScript 7**, patched by `@effect/tsgo` so `tsc` also reports Effect diagnostics. Relative imports use the `.ts` extension.
+- **Oxlint** (type-aware) for linting and **Oxfmt** for formatting. Pre-commit hooks (lefthook) run both on staged files.
+- **Vitest 5** with `@effect/vitest`. Tests sit next to the code as `*.spec.ts`.
+- **CI** (GitHub Actions) runs the format check and `nx affected -t lint typecheck test`.
+- TODO: library build (tsdown), Worker build and deploy (Vite and Wrangler), and release (`nx release`), when M1 and M3 need them.

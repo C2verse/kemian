@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "server",
+  "projectType": "library",
+  "sourceRoot": "packages/server/src",
+  "targets": {
+    "lint": {
+      "command": "oxlint {projectRoot}"
+    },
+    "typecheck": {
+      "command": "tsc -p {projectRoot}/tsconfig.json"
+    },
+    "test": {
+      "command": "vitest run",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

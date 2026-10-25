@@ -1,0 +1,142 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "import/no-default-export": "error",
+    "import/no-cycle": "error",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["_tag"]
+      }
+    ],
+    "vitest/no-standalone-expect": [
+      "error",
+      {
+        "additionalTestBlockFunctions": ["it.effect", "it.live", "it.scoped"]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["packages/server/src/protocol/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../bundler",
+                  "../bundler/*",
+                  "../core",
+                  "../core/*",
+                  "../cloudflare",
+                  "../cloudflare/*"
+                ],
+                "message": "protocol imports no other module."
+              },
+              {
+                "group": ["node:*"],
+                "message": "protocol uses no platform APIs."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/bundler/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../protocol",
+                  "../protocol/*",
+                  "!../protocol/index.ts",
+                  "../core",
+                  "../core/*",
+                  "../cloudflare",
+                  "../cloudflare/*"
+                ],
+                "message": "bundler imports only protocol, through its index.ts."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../protocol",
+                  "../protocol/*",
+                  "!../protocol/index.ts",
+                  "../bundler",
+                  "../bundler/*",
+                  "../cloudflare",
+                  "../cloudflare/*"
+                ],
+                "message": "core imports only protocol, through its index.ts."
+              },
+              {
+                "group": ["node:*"],
+                "message": "core uses no platform APIs."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/cloudflare/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../protocol",
+                  "../protocol/*",
+                  "!../protocol/index.ts",
+                  "../bundler",
+                  "../bundler/*",
+                  "../core",
+                  "../core/*",
+                  "!../core/index.ts"
+                ],
+                "message": "cloudflare imports only core and protocol, through their index.ts."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["fixtures/**", "**/dist/**", "**/node_modules/**"]
+}

@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/BundleSet",
+  "$defs": {
+    "BuildInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "createdAt": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "createdAt"
+      ],
+      "additionalProperties": true
+    },
+    "Level": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "FolderPath": {
+      "type": "string",
+      "pattern": "^(?:(?:[^/\\\\.][^/\\\\]*|\\.[^/\\\\.][^/\\\\]*|\\.\\.[^/\\\\]+)(?:\\/(?:[^/\\\\.][^/\\\\]*|\\.[^/\\\\.][^/\\\\]*|\\.\\.[^/\\\\]+))*)?$"
+    },
+    "BundleFolder": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/FolderPath"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": true
+    },
+    "FilePath": {
+      "type": "string",
+      "pattern": "^(?:[^/\\\\.][^/\\\\]*|\\.[^/\\\\.][^/\\\\]*|\\.\\.[^/\\\\]+)(?:\\/(?:[^/\\\\.][^/\\\\]*|\\.[^/\\\\.][^/\\\\]*|\\.\\.[^/\\\\]+))*$"
+    },
+    "BundleFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/FilePath"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Level"
+        },
+        "title": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9+.-]*:"
+        },
+        "meta": {
+          "type": "object"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "additionalProperties": true
+    },
+    "Bundle": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "number",
+          "enum": [
+            1
+          ]
+        },
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "build": {
+          "$ref": "#/$defs/BuildInfo"
+        },
+        "instructions": {
+          "type": "string"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BundleFolder"
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BundleFile"
+          }
+        }
+      },
+      "required": [
+        "protocol",
+        "level",
+        "build",
+        "folders",
+        "files"
+      ],
+      "additionalProperties": true
+    },
+    "BundleSet": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "number",
+          "enum": [
+            1
+          ]
+        },
+        "build": {
+          "$ref": "#/$defs/BuildInfo"
+        },
+        "bundles": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/Bundle"
+            }
+          ],
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Bundle"
+          }
+        }
+      },
+      "required": [
+        "protocol",
+        "build",
+        "bundles"
+      ],
+      "additionalProperties": true
+    }
+  }
+}
