@@ -36,12 +36,12 @@ The first deployment is the author's personal knowledge base:
 
 For the MVP, everything ships in one package, `@kemian/server`, organized into modules. Each module has its own subpath export, so it can become a package later without changing callers.
 
-| Module       | Export                      | Responsibility                                                                                                                                     | Later package               |
-| ------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `protocol`   | `@kemian/server/protocol`   | The bundle schema, its types, the version check, and the generated JSON Schema. The contract every other module depends on.                        | `@kemian/protocol`          |
-| `bundler`    | `@kemian/server/bundler`    | Parses the privacy markup and builds a bundle set from a folder of Markdown. Ships the `kemian` CLI (`build`, `check`, `publish`). Runs on Node.   | `@kemian/bundler-markdown`  |
-| `core`       | `@kemian/server/core`       | Platform-neutral logic: the `BundleStore` interface, publish validation, level resolution, search, and the MCP tools. No platform or service APIs. | `@kemian/core`              |
-| `cloudflare` | `@kemian/server/cloudflare` | Wires core into a Cloudflare Worker: routes, the MCP handler, the OAuth provider, and a `BundleStore` on R2.                                       | `@kemian/server-cloudflare` |
+| Module       | Export                      | Responsibility                                                                                                                                                                      | Later package               |
+| ------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `protocol`   | `@kemian/server/protocol`   | The bundle schema, its types, the version check, and the generated JSON Schema. The contract every other module depends on.                                                         | `@kemian/protocol`          |
+| `bundler`    | `@kemian/server/bundler`    | Parses the privacy markup and builds a bundle set from a folder of Markdown. Ships the `kemian` CLI (`build`, `check`, `publish`). Runs on Node.                                    | `@kemian/bundler-markdown`  |
+| `core`       | `@kemian/server/core`       | Platform-neutral logic on web-standard `Request` and `Response`: the `BundleStore` interface, publishing, level resolution, search, and the MCP tools. No platform or service APIs. | `@kemian/core`              |
+| `cloudflare` | `@kemian/server/cloudflare` | Wires core into a Cloudflare Worker: routes, the MCP handler, the OAuth provider, and a `BundleStore` on R2.                                                                        | `@kemian/server-cloudflare` |
 
 Modules added in later milestones: GitHub login (M2) and the chat backend (M4).
 
@@ -62,6 +62,7 @@ The implementation uses [Effect](https://effect.website) v4: services and layers
 
 - **The public API is plain TypeScript.** Deployers configure Kemian with plain objects and functions returning Promises, and never need to write Effect.
 - **The extension API is Kemian's own** (see [Extension](#extension)), so the MCP library underneath can change without affecting deployers.
+- **MCP goes through the official SDK.** Effect's `McpServer` serves Workers only with the sessionless 2026-07-28 revision, while clients such as Claude web negotiate 2025-era versions, so the MCP layer uses `@modelcontextprotocol/server` v2 instead (see [MCP server](#mcp-server)).
 - **`effect` is pinned to an exact version.** The HTTP router, HTTP API, CLI, and AI modules are marked unstable in 4.0.
 
 ## Bundle contract
@@ -171,13 +172,15 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **`/mcp?access=<level>` triggers a login.** Clients like Claude web only start OAuth after a 401, and an endpoint that accepts anonymous requests never sends one. The argument only makes the server demand a login; the token alone decides what a request sees.
 - **Read-only** in v1.
 - **Instructions:** the bundle's `instructions` go into the MCP initialize response and state the access level explicitly. Because not every client shows server instructions to the model, they're also returned from `list("/")`.
-- **Cloudflare implementation:** Effect's `McpServer`, served through `HttpRouter.toWebHandler` and wrapped in the Workers OAuth Provider; tools read the identity from the provider's props. If that doesn't work with Claude web behind the provider, the MCP layer falls back to the Agents SDK's `createMcpHandler` and the MCP SDK.
+- **Implementation:** `core` builds a fresh MCP server for every request with the caller's bundle and instructions, and serves it with the MCP SDK v2's `createMcpHandler`. That serves 2025-era clients statelessly and the 2026-07-28 revision per request, so nothing depends on sessions surviving between requests or Worker instances. Tool inputs are Effect schemas passed to the SDK as Standard Schema.
+- **Responses:** a caller whose identity maps to no level gets 403; before the first publish, every caller gets 503. A file the caller's level can't see reads as "Not found.", exactly like a missing one.
+- **`BundleStore` is a plain Promise interface** (`currentBuildId`, `getBundle`, `replace`), so deployments can bring their own storage without Effect. Readers and search indexes are cached per Worker instance, keyed by build and level.
 
 ### Extension
 
 A deployment's Worker imports Kemian as one feature and can add its own:
 
-- **Custom tools** through an `extend` hook. The hook receives a `registerTool({ name, description, input, handler })` function, where `input` is any [Standard Schema](https://standardschema.dev) and `handler` returns a Promise. It also receives the caller's resolved level, bundle, and identity, never the store, so custom code can't read another level's bundle by accident.
+- **Custom tools** through an `extend` hook. The hook receives a `registerTool({ name, description, input, handler })` function, where `input` is a [Standard Schema](https://standardschema.dev) that also implements Standard JSON Schema (zod 4, Valibot, ArkType, or Effect via `Schema.toStandardJSONSchemaV1`), and `handler` returns text or an MCP tool result. It also receives the caller's resolved level, bundle, and identity, never the store, so custom code can't read another level's bundle by accident.
 - **Custom routes** through a `fallback` handler for requests that aren't MCP, OAuth, or publishing (e.g. a `/chat` route).
 
 ## Chat backend
