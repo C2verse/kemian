@@ -11,9 +11,11 @@
     "./protocol": "./src/protocol/index.ts",
     "./bundler": "./src/bundler/index.ts",
     "./core": "./src/core/index.ts",
-    "./cloudflare": "./src/cloudflare/index.ts"
+    "./cloudflare": "./src/cloudflare/index.ts",
+    "./github": "./src/github/index.ts"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
     "@effect/platform-node": "4.0.6",
     "@modelcontextprotocol/server": "2.4.0",
     "effect": "4.0.6",

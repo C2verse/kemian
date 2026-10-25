@@ -53,7 +53,9 @@
                   "../core",
                   "../core/*",
                   "../cloudflare",
-                  "../cloudflare/*"
+                  "../cloudflare/*",
+                  "../github",
+                  "../github/*"
                 ],
                 "message": "protocol imports no other module."
               },
@@ -81,7 +83,9 @@
                   "../core",
                   "../core/*",
                   "../cloudflare",
-                  "../cloudflare/*"
+                  "../cloudflare/*",
+                  "../github",
+                  "../github/*"
                 ],
                 "message": "bundler imports only protocol, through its index.ts."
               }
@@ -105,7 +109,9 @@
                   "../bundler",
                   "../bundler/*",
                   "../cloudflare",
-                  "../cloudflare/*"
+                  "../cloudflare/*",
+                  "../github",
+                  "../github/*"
                 ],
                 "message": "core imports only protocol, through its index.ts."
               },
@@ -134,9 +140,42 @@
                   "../bundler/*",
                   "../core",
                   "../core/*",
-                  "!../core/index.ts"
+                  "!../core/index.ts",
+                  "../github",
+                  "../github/*"
                 ],
                 "message": "cloudflare imports only core and protocol, through their index.ts."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/github/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../protocol",
+                  "../protocol/*",
+                  "!../protocol/index.ts",
+                  "../bundler",
+                  "../bundler/*",
+                  "../core",
+                  "../core/*",
+                  "!../core/index.ts",
+                  "../cloudflare",
+                  "../cloudflare/*"
+                ],
+                "message": "github imports only core and protocol, through their index.ts."
+              },
+              {
+                "group": ["node:*"],
+                "message": "github uses no platform APIs."
               }
             ]
           }

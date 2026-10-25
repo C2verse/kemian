@@ -5,7 +5,7 @@
   "sourceRoot": "apps/demo/src",
   "targets": {
     "types": {
-      "command": "wrangler types",
+      "command": "wrangler types --strict-vars=false",
       "options": { "cwd": "{projectRoot}" },
       "cache": true,
       "inputs": ["{projectRoot}/wrangler.jsonc", "{projectRoot}/.dev.vars.example"],

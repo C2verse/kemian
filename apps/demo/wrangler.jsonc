@@ -4,7 +4,16 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "secrets": { "required": ["KEMIAN_PUBLISH_TOKEN"] },
+  "vars": {
+    // Sign-in is enabled when the GitHub OAuth app's ID is set here and its secret is set as a secret.
+    "GITHUB_CLIENT_ID": "",
+    "GITHUB_BASE_URL": "https://github.com",
+    "GITHUB_API_BASE_URL": "https://api.github.com",
+    // Comma-separated identities allowed into the private level, e.g. "github:12345".
+    "PRIVATE_IDENTITIES": "",
+  },
+  "secrets": { "required": ["KEMIAN_PUBLISH_TOKEN", "GITHUB_CLIENT_SECRET"] },
   "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "kemian-demo-bundles" }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
   "observability": { "enabled": true },
 }

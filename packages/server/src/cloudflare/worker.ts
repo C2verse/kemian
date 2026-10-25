@@ -5,15 +5,10 @@ import {
   type ExtendHook,
   type Identity,
   type Kemian,
+  type SignInProvider,
 } from '../core/index.ts';
 import type { Level } from '../protocol/index.ts';
-
-/**
- * Subset of a Worker's execution context that Kemian passes through.
- */
-export interface ExecutionContextLike {
-  waitUntil(promise: Promise<unknown>): void;
-}
+import { type FetchHandler, makeOAuthServer, type WorkerContext } from './oauth.ts';
 
 /**
  * Options of a Kemian Worker, built from the Worker's environment.
@@ -27,15 +22,23 @@ export interface KemianWorkerOptions<Env> {
   readonly levels?: Readonly<Record<Level, readonly string[]>>;
   /** Bearer token `kemian publish` must send; publishing is disabled without one. */
   readonly publishToken?: string;
+  /**
+   * Sign-in for callers with a level above the anonymous one, e.g. `githubSignIn(…)`.
+   *
+   * Requires a KV namespace bound as `OAUTH_KV`.
+   */
+  readonly signIn?: SignInProvider;
+  /** Public origin of the Worker, e.g. `https://kb.example.com`. Defaults to the origin of each request. */
+  readonly publicUrl?: string;
   /** Server name reported to MCP clients. Defaults to `kemian`. */
   readonly name?: string;
   /** Adds deployment-specific tools for each request. */
   readonly extend?: ExtendHook;
-  /** Serves requests that aren't for MCP or publishing. Defaults to 404. */
+  /** Serves requests that aren't for MCP, sign-in, or publishing. Defaults to 404. */
   readonly fallback?: (
     request: Request,
     env: Env,
-    context: ExecutionContextLike,
+    context: WorkerContext,
   ) => Response | Promise<Response>;
 }
 
@@ -43,7 +46,7 @@ export interface KemianWorkerOptions<Env> {
  * Worker entry point, the default export of a Worker module.
  */
 export interface KemianWorker<Env> {
-  fetch(request: Request, env: Env, context: ExecutionContextLike): Promise<Response>;
+  fetch(request: Request, env: Env, context: WorkerContext): Promise<Response>;
 }
 
 const MCP_PATH = '/mcp';
@@ -56,25 +59,31 @@ const CORS_HEADERS = {
   'access-control-expose-headers': 'mcp-session-id, www-authenticate',
 };
 
+interface WorkerInstance<Env> {
+  readonly kemian: Kemian;
+  readonly options: KemianWorkerOptions<Env>;
+  readonly oauthServers: Map<string, FetchHandler<Env>>;
+}
+
 /**
  * Creates a Kemian Worker whose options come from the Worker's environment.
  *
- * Options are built once per environment, so caches survive across requests in a Worker instance.
+ * Options are built once per environment, so caches survive across requests in a Worker instance. Anonymous
+ * requests to `/mcp` skip sign-in; a request with a token, with `?access=<level>`, or to a Worker that requires
+ * login goes through the OAuth server, which answers 401 to start sign-in.
  */
 export const kemian = <Env extends object>(
   configure: (env: Env) => KemianWorkerOptions<Env>,
 ): KemianWorker<Env> => {
-  const instances = new WeakMap<
-    Env,
-    { readonly kemian: Kemian; readonly options: KemianWorkerOptions<Env> }
-  >();
-  const instanceFor = (env: Env) => {
+  const instances = new WeakMap<Env, WorkerInstance<Env>>();
+  const instanceFor = (env: Env): WorkerInstance<Env> => {
     const existing = instances.get(env);
     if (existing !== undefined) return existing;
     const options = configure(env);
     const instance = {
       options,
       kemian: createKemian({ ...options, version: packageJson.version }),
+      oauthServers: new Map<string, FetchHandler<Env>>(),
     };
     instances.set(env, instance);
     return instance;
@@ -82,15 +91,54 @@ export const kemian = <Env extends object>(
 
   return {
     fetch: async (request, env, context) => {
-      const { kemian: server, options } = instanceFor(env);
-      const { pathname } = new URL(request.url);
-      if (pathname === MCP_PATH) return serveMcp(server, request, undefined);
-      if (pathname === PUBLISH_PATH) return server.handlePublish(request);
-      if (options.fallback !== undefined) return options.fallback(request, env, context);
-      return new Response('Not found', { status: 404 });
+      const instance = instanceFor(env);
+      const { kemian: server, options } = instance;
+      const url = new URL(request.url);
+      const fallback = async (
+        fallbackRequest: Request,
+        fallbackEnv: Env,
+        fallbackContext: WorkerContext,
+      ) =>
+        options.fallback === undefined
+          ? new Response('Not found', { status: 404 })
+          : options.fallback(fallbackRequest, fallbackEnv, fallbackContext);
+
+      if (url.pathname === PUBLISH_PATH) return server.handlePublish(request);
+      if (url.pathname === MCP_PATH && !isSignInRequested(request, url, options)) {
+        return serveMcp(server, request, undefined);
+      }
+      if (options.signIn === undefined) {
+        return url.pathname === MCP_PATH
+          ? serveMcp(server, request, undefined)
+          : fallback(request, env, context);
+      }
+
+      const origin = (options.publicUrl ?? url.origin).replace(/\/+$/u, '');
+      const oauthServer =
+        instance.oauthServers.get(origin) ??
+        makeOAuthServer<Env>({
+          origin,
+          mcpPath: MCP_PATH,
+          kemian: server,
+          signIn: options.signIn,
+          serveMcp: (mcpRequest, identity) => serveMcp(server, mcpRequest, identity),
+          fallback,
+        });
+      instance.oauthServers.set(origin, oauthServer);
+      return oauthServer.fetch(request, env, context);
     },
   };
 };
+
+const isSignInRequested = (
+  request: Request,
+  url: URL,
+  options: { readonly anonymous?: Level | false },
+): boolean =>
+  request.method !== 'OPTIONS' &&
+  (request.headers.has('authorization') ||
+    url.searchParams.has('access') ||
+    options.anonymous === false);
 
 const serveMcp = async (
   server: Kemian,

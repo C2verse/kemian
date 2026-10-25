@@ -1,6 +1,6 @@
 # Kemian design
 
-Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done, and M1 works locally; nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
+Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done, and M1 and M2 work locally; nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
 
 ## Problem
 
@@ -42,12 +42,13 @@ For the MVP, everything ships in one package, `@kemian/server`, organized into m
 | `bundler`    | `@kemian/server/bundler`    | Parses the privacy markup and builds a bundle set from a folder of Markdown. Ships the `kemian` CLI (`build`, `check`, `publish`). Runs on Node.                                    | `@kemian/bundler-markdown`  |
 | `core`       | `@kemian/server/core`       | Platform-neutral logic on web-standard `Request` and `Response`: the `BundleStore` interface, publishing, level resolution, search, and the MCP tools. No platform or service APIs. | `@kemian/core`              |
 | `cloudflare` | `@kemian/server/cloudflare` | Wires core into a Cloudflare Worker: routes, the MCP handler, the OAuth provider, and a `BundleStore` on R2.                                                                        | `@kemian/server-cloudflare` |
+| `github`     | `@kemian/server/github`     | GitHub sign-in: a `SignInProvider` that turns a GitHub login into an identity like `github:12345`.                                                                                  | `@kemian/auth-github`       |
 
-Modules added in later milestones: GitHub login (M2) and the chat backend (M4).
+The chat backend (M4) will be another module.
 
 Module rules, enforced by Oxlint:
 
-- `protocol` imports no other module. `bundler` and `core` import only `protocol`. `cloudflare` imports `core` and `protocol`. Nothing imports `cloudflare`.
+- `protocol` imports no other module. `bundler` and `core` import only `protocol`. `cloudflare` and `github` import `core` and `protocol`. Nothing imports `cloudflare` or `github`; a deployment passes `githubSignIn(…)` to the Worker as a `SignInProvider`.
 - Modules import each other only through their `index.ts`.
 - Service-specific code lives in its own module behind an interface defined in `core`.
 
@@ -143,15 +144,16 @@ Worker (`apps/demo` is a complete example):
 export default kemian((env: Env) => ({
   store: r2BundleStore(env.BUNDLES),
   anonymous: 'public', // or false to require login
-  levels: { private: ['github:12345'] }, // identities per level (M2)
+  levels: { private: ['github:12345'] }, // identities per level
   publishToken: env.KEMIAN_PUBLISH_TOKEN,
+  signIn: githubSignIn({ clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }),
   extend({ registerTool }, { level, bundle, identity }) {},
   fallback: (request, env, ctx) => new Response('…'),
 }));
 ```
 
 - Options are built once per Worker environment, so reader and search caches survive across requests in a Worker instance.
-- Routes: `/mcp` (with permissive CORS, since access is decided by bearer tokens, not cookies), `/publish`, and everything else to `fallback` (404 by default).
+- Routes: `/mcp` (with permissive CORS, since access is decided by bearer tokens, not cookies), `/publish`, the OAuth endpoints when sign-in is configured (`/authorize`, `/callback`, `/token`, `/register`, `/.well-known/…`), and everything else to `fallback` (404 by default).
 
 ## Pipeline
 
@@ -178,6 +180,14 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **Implementation:** `core` builds a fresh MCP server for every request with the caller's bundle and instructions, and serves it with the MCP SDK v2's `createMcpHandler`. That serves 2025-era clients statelessly and the 2026-07-28 revision per request, so nothing depends on sessions surviving between requests or Worker instances. Tool inputs are Effect schemas passed to the SDK as Standard Schema.
 - **Responses:** a caller whose identity maps to no level gets 403; before the first publish, every caller gets 503. A file the caller's level can't see reads as "Not found.", exactly like a missing one.
 - **`BundleStore` is a plain Promise interface** (`currentBuildId`, `getBundle`, `replace`), so deployments can bring their own storage without Effect. Readers and search indexes are cached per Worker instance, keyed by build and level.
+
+### Sign-in
+
+- **The Worker is its own OAuth authorization server**, built on the Workers OAuth Provider, with tokens and grants in a KV namespace bound as `OAUTH_KV`. Clients register dynamically at `/register`. TODO: Client ID Metadata Documents are off, since they need the `global_fetch_strictly_public` compatibility flag; enable them if a client requires them.
+- **Anonymous requests skip it.** A request to `/mcp` without a token goes straight to the anonymous level. A request with a token, with `?access=<level>`, or to a Worker with `anonymous: false` goes through the OAuth server, which answers 401 with the resource metadata to start sign-in.
+- **Consent comes first.** `/authorize` shows which client is asking and where the token will go, then hands the browser to the sign-in provider. The library's helpers bind the consent page and the provider's `state` to the browser, so a forged page or a stolen code is refused. This guards against the MCP confused-deputy problem, since every client signs in through the same OAuth app.
+- **Identities without a level are refused at sign-in** with `access_denied`, so strangers never get a token. Since the level is resolved on every request, a token whose identity later loses its level gets 403.
+- **GitHub sign-in** uses PKCE and identifies users by numeric ID, which survives renames. Grants are stored per user as `github.12345`, since the provider reserves `:`.
 
 ### Extension
 
@@ -231,7 +241,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 
 - **M0, workspace:** the tooling above, coding conventions, CI, and the fixture knowledge base.
 - **M1, public MVP on Cloudflare:** the `protocol`, `bundler`, `core`, and `cloudflare` modules; the anonymous level only; `apps/demo` deployed to `workers.dev`. Done when Claude web, connected anonymously to the demo, answers from the fixture knowledge base. Everything but the deployment works and is tested locally.
-- **M2, private level:** the Workers OAuth Provider with GitHub login, `?access=<level>`, and the identity-to-level mapping.
+- **M2, private level:** the Workers OAuth Provider with GitHub login, `?access=<level>`, and the identity-to-level mapping. Works and is tested locally against a fake GitHub.
 - **M3, first real deployment:** publish `@kemian/server` 0.x with `nx release`; the author's content repo runs `kemian publish` in CI and the author deploys a Worker.
 - **M4, chat backend:** a chat module adding a `/chat` route.
 - **M5, template:** the template and Deploy button, then splitting modules into packages once their boundaries hold.
@@ -249,7 +259,6 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 - TODO: Which clients to support besides Claude and the chat widget. ChatGPT may need tools named `search` and `fetch` with specific shapes (unverified).
 - TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing.
 - TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast). Line-based parsing doesn't recognize indented code blocks, so tags in them count as markup, which errs toward hiding.
-- TODO: Whether a logged-in identity that maps to no level sees nothing or falls back to the anonymous level.
 - TODO: Whether non-Markdown files (images, PDFs) are ever bundled. For now only Markdown is.
 - TODO: How search fits the Workers free tier's 10 ms of CPU per request. Measured on 2026-10-25 in Node with synthetic files of about 3.7 KiB: parsing and decoding a bundle takes under 5 ms even at 1,000 files, but building the MiniSearch index takes 15 ms at 100 files, 60 ms at 300, and 160 ms at 1,000, while loading a prebuilt index takes 1 to 6 ms. The index is built lazily on the first search per Worker instance, so `list` and `read` never pay for it. Options: the paid plan, or building the index ahead of time (in the bundler, or at publish).
 
