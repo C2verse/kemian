@@ -2,9 +2,9 @@ import { describe, expect, it } from '@effect/vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { Schema } from 'effect';
 
+import { bundleSetOf } from '../../test/bundles.ts';
 import type { Identity } from './access.ts';
 import { memoryBundleStore } from './bundle-store.memory.ts';
-import { bundleSetOf } from './core-fixtures.spec-helper.ts';
 import { createKemian, type Kemian, type KemianOptions } from './kemian.ts';
 
 const robin: Identity = { provider: 'github', id: '12345', name: 'robin' };

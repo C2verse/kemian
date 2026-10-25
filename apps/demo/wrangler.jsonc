@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kemian-demo",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": { "required": ["KEMIAN_PUBLISH_TOKEN"] },
+  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "kemian-demo-bundles" }],
+  "observability": { "enabled": true },
+}

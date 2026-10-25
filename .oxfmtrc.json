@@ -5,5 +5,10 @@
   "quoteProps": "consistent",
   "sortImports": {},
   "sortPackageJson": true,
-  "ignorePatterns": ["fixtures/**", "packages/*/schema/**", "pnpm-lock.yaml"]
+  "ignorePatterns": [
+    "fixtures/**",
+    "packages/*/schema/**",
+    "pnpm-lock.yaml",
+    "**/worker-configuration.d.ts"
+  ]
 }

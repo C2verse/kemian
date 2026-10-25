@@ -1,6 +1,6 @@
 # Kemian design
 
-Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done; nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
+Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done, and M1 works locally; nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
 
 ## Problem
 
@@ -137,18 +137,21 @@ export default defineConfig({
 - Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns something unexpected drops the file too.
 - The CLI is `kemian check` and `kemian build` (to `dist/kemian/bundle-set.json`); both exit with code 1 when there are errors.
 
-Worker:
+Worker (`apps/demo` is a complete example):
 
 ```ts
-export default kemian((env) => ({
-  store: r2Store(env.BUNDLES),
-  anonymous: 'public',
+export default kemian((env: Env) => ({
+  store: r2BundleStore(env.BUNDLES),
+  anonymous: 'public', // or false to require login
+  levels: { private: ['github:12345'] }, // identities per level (M2)
   publishToken: env.KEMIAN_PUBLISH_TOKEN,
-  auth: githubAuth({ /* M2 */ levels: { private: [/* GitHub user IDs */] } }),
   extend({ registerTool }, { level, bundle, identity }) {},
-  fallback(request, env, ctx) {},
+  fallback: (request, env, ctx) => new Response('…'),
 }));
 ```
+
+- Options are built once per Worker environment, so reader and search caches survive across requests in a Worker instance.
+- Routes: `/mcp` (with permissive CORS, since access is decided by bearer tokens, not cookies), `/publish`, and everything else to `fallback` (404 by default).
 
 ## Pipeline
 
@@ -159,7 +162,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **Bundling runs in CI**, not on the server: markup errors fail the build where the author sees them, and serverless CPU limits (e.g. Workers' free tier) may not fit bundling a whole repo.
 - **The content repo pushes.** Its CI runs `kemian publish`, which sends the bundle set to the Worker's `PUT /publish` with a bearer token. A leaked token lets someone replace the content, but not read it.
 - **`/publish` validates against the protocol and replaces all levels together.** If validation fails, the current build stays, so a broken build never takes the server down.
-- **The `BundleStore` is on R2.** It writes a build's bundles under the build's ID, then switches a pointer to it; R2 is strongly consistent, so readers see one build or the other, never a mix. KV holds only OAuth tokens (M2).
+- **The `BundleStore` is on R2.** It writes a build's bundles under the build's ID, then switches a pointer to it; R2 is strongly consistent, so readers see one build or the other, never a mix. It keeps the previous build for readers still on it and deletes older ones. KV holds only OAuth tokens (M2).
 - **Credentials:** the content repo holds the publish token. The server holds no GitHub credentials.
 
 ## MCP server
@@ -221,13 +224,13 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 | Git hooks       | lefthook                                                       |
 | CI              | GitHub Actions                                                 |
 
-- Vitest 5 rules out `@cloudflare/vitest-pool-workers`, which supports only Vitest 4. Core and the Worker handler are tested in Node with in-memory layers, and the Worker is covered by a smoke test against `wrangler dev` and the deployed demo.
+- Vitest 5 rules out `@cloudflare/vitest-pool-workers`, which supports only Vitest 4. Modules are tested in Node with in-memory stores and the official MCP client; `apps/demo` runs end-to-end tests in local `workerd` through Wrangler's `createTestHarness`, publishing the fixture with the real CLI and reading it back over MCP.
 - Vite+ isn't used yet: its task runner duplicates Nx, and it pins tool versions the Cloudflare tooling doesn't support yet. It wraps the same tools, so switching later is cheap.
 
 ## Milestones
 
 - **M0, workspace:** the tooling above, coding conventions, CI, and the fixture knowledge base.
-- **M1, public MVP on Cloudflare:** the `protocol`, `bundler`, `core`, and `cloudflare` modules; the anonymous level only; `apps/demo` deployed to `workers.dev`. First, check Effect's `McpServer` with Claude web; also measure parsing and indexing CPU time against the Workers free tier. Done when Claude web, connected anonymously to the demo, answers from the fixture knowledge base.
+- **M1, public MVP on Cloudflare:** the `protocol`, `bundler`, `core`, and `cloudflare` modules; the anonymous level only; `apps/demo` deployed to `workers.dev`. Done when Claude web, connected anonymously to the demo, answers from the fixture knowledge base. Everything but the deployment works and is tested locally.
 - **M2, private level:** the Workers OAuth Provider with GitHub login, `?access=<level>`, and the identity-to-level mapping.
 - **M3, first real deployment:** publish `@kemian/server` 0.x with `nx release`; the author's content repo runs `kemian publish` in CI and the author deploys a Worker.
 - **M4, chat backend:** a chat module adding a `/chat` route.
@@ -248,6 +251,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 - TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast). Line-based parsing doesn't recognize indented code blocks, so tags in them count as markup, which errs toward hiding.
 - TODO: Whether a logged-in identity that maps to no level sees nothing or falls back to the anonymous level.
 - TODO: Whether non-Markdown files (images, PDFs) are ever bundled. For now only Markdown is.
+- TODO: How search fits the Workers free tier's 10 ms of CPU per request. Measured on 2026-10-25 in Node with synthetic files of about 3.7 KiB: parsing and decoding a bundle takes under 5 ms even at 1,000 files, but building the MiniSearch index takes 15 ms at 100 files, 60 ms at 300, and 160 ms at 1,000, while loading a prebuilt index takes 1 to 6 ms. The index is built lazily on the first search per Worker instance, so `list` and `read` never pay for it. Options: the paid plan, or building the index ahead of time (in the bundler, or at publish).
 
 ## Prior art
 

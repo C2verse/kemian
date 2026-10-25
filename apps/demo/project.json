@@ -1,0 +1,41 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "demo",
+  "projectType": "application",
+  "sourceRoot": "apps/demo/src",
+  "targets": {
+    "types": {
+      "command": "wrangler types",
+      "options": { "cwd": "{projectRoot}" },
+      "cache": true,
+      "inputs": ["{projectRoot}/wrangler.jsonc", "{projectRoot}/.dev.vars.example"],
+      "outputs": ["{projectRoot}/worker-configuration.d.ts"]
+    },
+    "lint": {
+      "command": "oxlint {projectRoot}"
+    },
+    "typecheck": {
+      "dependsOn": ["types"],
+      "command": "tsc -p {projectRoot}/tsconfig.json && tsc -p {projectRoot}/test/tsconfig.json"
+    },
+    "test": {
+      "command": "vitest run",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "dev": {
+      "continuous": true,
+      "command": "vite dev",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "build": {
+      "command": "vite build",
+      "options": { "cwd": "{projectRoot}" },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "deploy": {
+      "dependsOn": ["build"],
+      "command": "wrangler deploy",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

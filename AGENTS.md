@@ -24,11 +24,14 @@ pnpm workspace on Node 24, orchestrated by Nx. Run commands from the repo root:
 pnpm install                                  # also installs Git hooks and patches TypeScript and Oxlint for Effect
 pnpm exec nx run-many -t lint typecheck test  # everything; `pnpm check` for short
 pnpm exec nx test server                      # one target of one project
+pnpm exec nx dev demo                         # run the demo Worker locally (Vite, local R2)
 pnpm exec oxfmt                               # format; `--check` to verify only
 ```
 
 - **TypeScript 7**, patched by `@effect/tsgo` so `tsc` also reports Effect diagnostics. Relative imports use the `.ts` extension.
 - **Oxlint** (type-aware) for linting and **Oxfmt** for formatting. Pre-commit hooks (lefthook) run both on staged files.
-- **Vitest 5** with `@effect/vitest`. Tests sit next to the code as `*.spec.ts`.
+- **Vitest 5** with `@effect/vitest`. Tests sit next to the code as `*.spec.ts`; shared test data lives in `packages/server/test/`. The demo's end-to-end tests run the Worker in local `workerd` with Wrangler's `createTestHarness`.
+- **Worker:** Vite with `@cloudflare/vite-plugin` builds it (`nx build demo`) and Wrangler deploys it (`nx deploy demo`). `nx typecheck demo` generates `worker-configuration.d.ts` with `wrangler types` first. Local secrets go in `apps/demo/.dev.vars`, copied from `.dev.vars.example`.
+- **The `kemian` CLI** runs from source during development: `node packages/server/src/bundler/cli.ts check` in a knowledge base folder, e.g. `fixtures/knowledge-base`.
 - **CI** (GitHub Actions) runs the format check and `nx affected -t lint typecheck test`.
-- TODO: library build (tsdown), Worker build and deploy (Vite and Wrangler), and release (`nx release`), when M1 and M3 need them.
+- TODO: library build (tsdown) and release (`nx release`), when M3 needs them.

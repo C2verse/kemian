@@ -1,4 +1,4 @@
-import type { Bundle, BundleSet } from '../protocol/index.ts';
+import type { Bundle, BundleSet } from '../src/protocol/index.ts';
 
 export const buildOf = (id: string) => ({ id, createdAt: '2026-10-25T12:00:00Z' });
 

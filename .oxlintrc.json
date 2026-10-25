@@ -34,6 +34,12 @@
       }
     },
     {
+      "files": ["apps/*/src/index.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
       "files": ["packages/server/src/protocol/**"],
       "rules": {
         "no-restricted-imports": [
@@ -138,5 +144,10 @@
       }
     }
   ],
-  "ignorePatterns": ["fixtures/**", "**/dist/**", "**/node_modules/**"]
+  "ignorePatterns": [
+    "fixtures/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/worker-configuration.d.ts"
+  ]
 }

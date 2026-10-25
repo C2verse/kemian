@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest';
 
+import { privateBundle } from '../../test/bundles.ts';
 import { BundleReader } from './bundle-reader.ts';
-import { privateBundle } from './core-fixtures.spec-helper.ts';
 
 const reader = new BundleReader(privateBundle());
 

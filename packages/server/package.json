@@ -10,7 +10,8 @@
   "exports": {
     "./protocol": "./src/protocol/index.ts",
     "./bundler": "./src/bundler/index.ts",
-    "./core": "./src/core/index.ts"
+    "./core": "./src/core/index.ts",
+    "./cloudflare": "./src/cloudflare/index.ts"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.6",

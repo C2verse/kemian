@@ -2,8 +2,10 @@ packages:
   - 'packages/*'
   - 'apps/*'
 allowBuilds:
+  esbuild: true
   lefthook: false
   nx: true
+  workerd: true
 minimumReleaseAgeExclude:
   - '@effect/tsgo-darwin-arm64@0.57.0'
   - '@effect/tsgo-darwin-x64@0.57.0'

@@ -3,6 +3,8 @@ dist
 coverage
 .wrangler
 .dev.vars*
+!.dev.vars.example
+worker-configuration.d.ts
 
 /.nx/cache
 /.nx/workspace-data

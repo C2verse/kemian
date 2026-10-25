@@ -1,0 +1,10 @@
+{
+  "name": "@kemian/demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kemian Worker serving the fixture knowledge base.",
+  "type": "module",
+  "dependencies": {
+    "@kemian/server": "workspace:*"
+  }
+}
