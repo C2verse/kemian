@@ -2,6 +2,7 @@
   "name": "@kemian/server",
   "version": "0.0.0",
   "description": "Serves one Markdown knowledge base to different audiences over MCP.",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/C2verse/kemian.git",

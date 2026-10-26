@@ -36,4 +36,3 @@ pnpm exec oxfmt                               # format; `--check` to verify only
 - **CI** (GitHub Actions) runs the format check and `nx affected -t lint typecheck test`.
 - **Package build:** `nx build server` bundles the JavaScript with tsdown and emits declarations with `tsc`, since tsdown's declaration plugin needs TypeScript's JS API, which TypeScript 7 doesn't have. Publishing swaps `exports` and `bin` to `dist` through `publishConfig`; `packages/server/test/package.spec.ts` packs the package and checks the result.
 - **Release** is manual for now: `pnpm --filter @kemian/server version <x.y.z> --no-git-tag-version`, run all checks, commit "release @kemian/server x.y.z", tag `server@x.y.z`, then `pnpm --filter @kemian/server publish`. `nx release` needs `@nx/js`, which breaks the project graph on TypeScript 7 for the same reason.
-- TODO: choose a license before the first publish.
