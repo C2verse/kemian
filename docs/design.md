@@ -235,6 +235,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 - Vitest 5 rules out `@cloudflare/vitest-pool-workers`, which supports only Vitest 4. Modules are tested in Node with in-memory stores and the official MCP client; `apps/demo` runs end-to-end tests in local `workerd` through Wrangler's `createTestHarness`, publishing the fixture with the real CLI and reading it back over MCP.
 - tsdown can't emit declarations with TypeScript 7, which has no JS API, so `tsc` emits them. For the same reason `nx release`, which needs `@nx/js`, isn't used: releases are a manual pnpm version-and-publish for now.
 - Vite+ isn't used yet: its task runner duplicates Nx, and it pins tool versions the Cloudflare tooling doesn't support yet. It wraps the same tools, so switching later is cheap.
+- **Agent instructions live in `AGENTS.md` files** (decided 2026-10-26), so they work in any coding agent: Codex, Cursor, Copilot, and Claude Code all read them, and most also read the ones in subdirectories. Beside each is a one-line `CLAUDE.md` that imports it, because Claude Code reads `AGENTS.md` only from v2.1.277 on, only where there's no `CLAUDE.md`, and loads a subdirectory's `AGENTS.md` on fewer triggers than its `CLAUDE.md`. Rules scoped to file patterns stay in `.claude/rules/`, since agents share no format for them: Claude Code and VS Code load them, and the root `AGENTS.md` lists them for other agents.
 
 ## Prior Art
 
