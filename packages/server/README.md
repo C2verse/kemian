@@ -36,7 +36,7 @@ I lead <private alt="a team">the plugin platform team at Quillwork</private>.
 </private>
 ```
 
-The full rules are in the [privacy markup spec](https://github.com/C2verse/kemian/blob/main/docs/privacy-markup.md). Add `kemian.config.ts` at the root of the knowledge base:
+The full rules are in the [privacy markup spec](https://github.com/C2verse/kemian/blob/HEAD/docs/privacy-markup.md). Add `kemian.config.ts` at the root of the knowledge base:
 
 ```ts
 import { defineConfig } from '@kemian/server/bundler';

@@ -22,5 +22,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: develop
       - run: pnpm exec oxfmt --check
       - run: pnpm exec nx affected -t lint typecheck test build

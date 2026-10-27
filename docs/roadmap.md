@@ -25,7 +25,7 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 In order:
 
-1. Push the repository to `C2verse/kemian` (`main` first, so it becomes the default branch) and check that CI passes.
+1. Push `develop` to `C2verse/kemian` as its first branch, so it becomes the default branch, and check that CI passes.
 2. Log Wrangler in (`npx wrangler login`), deploy the demo with `pnpm exec nx deploy demo`, and set its `KEMIAN_PUBLISH_TOKEN` secret.
 3. Publish the fixture to the deployed demo and connect Claude web to `/mcp`. This is the first test with a real client; until then, client compatibility is only known from the protocol tests.
 4. Create a GitHub OAuth app for the demo, set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `PRIVATE_IDENTITIES`, and sign in from Claude web.

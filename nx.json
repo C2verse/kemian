@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "defaultBase": "main",
+  "defaultBase": "develop",
   "neverConnectToCloud": true,
   "namedInputs": {
     "sharedGlobals": [

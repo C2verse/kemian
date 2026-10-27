@@ -2,3 +2,4 @@
 - Read-only commands (`log`, `diff`, `status`, `show`) need no permission.
 - Do not modify Git configuration.
 - Commit messages are lowercase sentences, e.g. "add bundle schema".
+- The default branch is `develop`: branch from it and open pull requests against it.
