@@ -1,10 +1,10 @@
-# Privacy markup
+# Privacy Markup
 
 The markup the Markdown bundler reads to decide what each level sees. It's plain Markdown plus HTML-style tags, so files still render on GitHub and in editors: the tags are hidden in rendered views and visible in the source.
 
 Levels are configured as an ordered list, lowest first, e.g. `['public', 'private']`. Each level sees everything the levels below it see. The examples use those two levels.
 
-## Files and folders
+## Files & Folders
 
 Frontmatter names the lowest level that may see a file:
 
@@ -36,7 +36,7 @@ Any Markdown: headings, lists, tables, code blocks.
 - The opening and closing tags each sit alone on their own line.
 - Leave a blank line before and after each tag. Without them, renderers show the Markdown inside as raw text. `kemian check` warns about missing blank lines.
 
-## Inline spans
+## Inline Spans
 
 ```markdown
 I lead <private alt="a team">the plugin platform team at Quillwork</private>.
@@ -57,7 +57,7 @@ The public version reads "I lead a team."
 
 Values use double quotes. No other attributes are allowed.
 
-## What each level gets
+## What Each Level Gets
 
 - Content above a level is removed, or replaced by its `alt`.
 - Content a level may see keeps its tags in that level's bundle, so agents at that level know what's restricted. Tags of the lowest level are always removed. Configuration can remove all tags instead.

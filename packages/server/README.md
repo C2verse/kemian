@@ -2,6 +2,8 @@
 
 Serve one Markdown knowledge base to different audiences over MCP. Mark private content inline, build a redacted bundle for each access level, and let each AI client see only the level its credential maps to.
 
+**Status:** 0.x, working and tested locally but not yet deployed; APIs may change before 1.0.
+
 Everything ships in this package for now, as separate entry points:
 
 | Entry point                 | What it's for                                                        |
@@ -12,8 +14,9 @@ Everything ships in this package for now, as separate entry points:
 | `@kemian/server/github`     | GitHub sign-in for levels above the anonymous one                    |
 | `@kemian/server/core`       | Platform-neutral server logic, to host Kemian somewhere else         |
 | `@kemian/server/protocol`   | The bundle schema; JSON Schema files are in `@kemian/server/schema/` |
+| `@kemian/server/search`     | The prebuilt search index, for bundlers other than Kemian's          |
 
-## 1. Mark up the knowledge base
+## 1. Mark Up the Knowledge Base
 
 Levels are an ordered list, lowest first. A file or folder names the lowest level that may see it in its frontmatter, and a tag named after a level marks content inside a file:
 
@@ -66,7 +69,7 @@ export default kemian((env: Env) => ({
 
 The Worker needs an R2 bucket bound as `BUNDLES`, a KV namespace bound as `OAUTH_KV` (for sign-in), and the secrets `KEMIAN_PUBLISH_TOKEN` and `GITHUB_CLIENT_SECRET`. For GitHub sign-in, create a GitHub OAuth app whose callback URL is `https://<your worker>/callback`. Without `signIn`, the Worker serves only the anonymous level.
 
-## 3. Publish from CI
+## 3. Publish From CI
 
 ```yaml
 - run: npx kemian publish --url https://<your worker>
@@ -76,7 +79,7 @@ The Worker needs an R2 bucket bound as `BUNDLES`, a KV namespace bound as `OAUTH
 
 `kemian publish` builds every level's bundle, refuses to publish when there are errors, and replaces all levels on the server together.
 
-## 4. Connect a client
+## 4. Connect a Client
 
 - Public: add `https://<your worker>/mcp` as a remote MCP server. No login needed.
 - Private: add `https://<your worker>/mcp?access=private`. The client starts a GitHub login, and only identities listed under a level get in.

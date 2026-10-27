@@ -1,3 +1,4 @@
 - Never run a mutating Git command (`commit`, `push`, `add`, `merge`, `rebase`, ...) without explicit permission.
 - Read-only commands (`log`, `diff`, `status`, `show`) need no permission.
 - Do not modify Git configuration.
+- Commit messages are lowercase sentences, e.g. "add bundle schema".

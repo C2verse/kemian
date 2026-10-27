@@ -1,6 +1,6 @@
-# Kemian design
+# Kemian Design
 
-Status: draft. Initial design from 2026-10-20; MVP decisions from 2026-10-25. M0 is done; M1 and M2 work locally, and the package is ready to publish (M3). Nothing is deployed yet. Update this file whenever a decision changes, and mark open questions `TODO:`.
+The decisions behind Kemian and their reasons, from 2026-10-20 on. It records only what is decided; progress, next steps, and open questions are in [roadmap.md](roadmap.md).
 
 ## Problem
 
@@ -22,7 +22,7 @@ The name is 刻面 (_kèmiàn_), the gemology term for "facet": one body of know
 - **Bundle set:** the bundles of every level from one build, published and replaced together.
 - **Identity:** who a caller is, established by an auth provider (e.g. a GitHub user). Configuration maps identities to levels.
 
-## Example deployment
+## Example Deployment
 
 The first deployment is the author's personal knowledge base:
 
@@ -45,8 +45,6 @@ For the MVP, everything ships in one package, `@kemian/server`, organized into m
 | `cloudflare` | `@kemian/server/cloudflare` | Wires core into a Cloudflare Worker: routes, the MCP handler, the OAuth provider, and a `BundleStore` on R2.                                                                        | `@kemian/server-cloudflare` |
 | `github`     | `@kemian/server/github`     | GitHub sign-in: a `SignInProvider` that turns a GitHub login into an identity like `github:12345`.                                                                                  | `@kemian/auth-github`       |
 
-The chat backend (M4) will be another module.
-
 Module rules, enforced by Oxlint:
 
 - `protocol` imports no other module. `search` imports only `protocol`. `bundler` and `core` import `protocol` and `search`. `cloudflare` and `github` import `core` and `protocol`. Nothing imports `cloudflare` or `github`; a deployment passes `githubSignIn(…)` to the Worker as a `SignInProvider`.
@@ -67,7 +65,7 @@ The implementation uses [Effect](https://effect.website) v4: typed errors for ev
 - **MCP goes through the official SDK.** Effect's `McpServer` serves Workers only with the sessionless 2026-07-28 revision, while clients such as Claude web negotiate 2025-era versions, so the MCP layer uses `@modelcontextprotocol/server` v2 instead (see [MCP server](#mcp-server)).
 - **`effect` is pinned to an exact version.** The HTTP router, HTTP API, CLI, and AI modules are marked unstable in 4.0.
 
-## Bundle contract
+## Bundle Contract
 
 - The server knows nothing about a content repo's layout, frontmatter, or markup. It only reads bundles.
 - Redaction happens in the bundler, before the server sees content. A server bug can expose at most the bundle the caller's level maps to.
@@ -111,7 +109,7 @@ interface BundleSet {
 - **The search index ships in the bundle** (decided 2026-10-26). The bundler builds a MiniSearch index from each level's own redacted files, so it holds no term that level may not see. `format` names the engine and indexed fields; a reader that doesn't know the format, or can't load the data, builds its own index from the files, so other bundlers can leave it out. It roughly doubles a bundle's size. Measured in Node with 300 synthetic files, a cold first search (parsing, decoding, and loading) dropped from 121 ms to 21 ms, and from 36 ms to 13 ms at 100 files.
 - **The generated JSON Schema is checked in.** CI fails when it changes unintentionally, so the contract only changes deliberately.
 
-## Privacy markup
+## Privacy Markup
 
 The full spec is [privacy-markup.md](privacy-markup.md). In short:
 
@@ -171,7 +169,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **The `BundleStore` is on R2.** It writes a build's bundles under the build's ID, then switches a pointer to it; R2 is strongly consistent, so readers see one build or the other, never a mix. It keeps the previous build for readers still on it and deletes older ones. KV holds only OAuth tokens (M2).
 - **Credentials:** the content repo holds the publish token. The server holds no GitHub credentials.
 
-## MCP server
+## MCP Server
 
 - One `/mcp` endpoint. Tools are named by action:
   - `list(path)`: a folder's entries with their summaries.
@@ -187,7 +185,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 
 ### Sign-in
 
-- **The Worker is its own OAuth authorization server**, built on the Workers OAuth Provider, with tokens and grants in a KV namespace bound as `OAUTH_KV`. Clients register dynamically at `/register`. TODO: Client ID Metadata Documents are off, since they need the `global_fetch_strictly_public` compatibility flag; enable them if a client requires them.
+- **The Worker is its own OAuth authorization server**, built on the Workers OAuth Provider, with tokens and grants in a KV namespace bound as `OAUTH_KV`. Clients register dynamically at `/register`. Client ID Metadata Documents are off, since they need the `global_fetch_strictly_public` compatibility flag, which would also block requests to local test servers.
 - **Anonymous requests skip it.** A request to `/mcp` without a token goes straight to the anonymous level. A request with a token, with `?access=<level>`, or to a Worker with `anonymous: false` goes through the OAuth server, which answers 401 with the resource metadata to start sign-in.
 - **Consent comes first.** `/authorize` shows which client is asking and where the token will go, then hands the browser to the sign-in provider. The library's helpers bind the consent page and the provider's `state` to the browser, so a forged page or a stolen code is refused. This guards against the MCP confused-deputy problem, since every client signs in through the same OAuth app.
 - **Identities without a level are refused at sign-in** with `access_denied`, so strangers never get a token. Since the level is resolved on every request, a token whose identity later loses its level gets 403.
@@ -200,7 +198,7 @@ A deployment's Worker imports Kemian as one feature and can add its own:
 - **Custom tools** through an `extend` hook. The hook receives a `registerTool({ name, description, input, handler })` function, where `input` is a [Standard Schema](https://standardschema.dev) that also implements Standard JSON Schema (zod 4, Valibot, ArkType, or Effect via `Schema.toStandardJSONSchemaV1`), and `handler` returns text or an MCP tool result. It also receives the caller's resolved level, bundle, and identity, never the store, so custom code can't read another level's bundle by accident.
 - **Custom routes** through a `fallback` handler for requests that aren't MCP, OAuth, or publishing (e.g. a `/chat` route).
 
-## Chat backend
+## Chat Backend
 
 A backend for an "ask about me" widget on a website. The widget only renders streamed responses and holds no secrets or logic.
 
@@ -209,10 +207,6 @@ A backend for an "ask about me" widget on a website. The widget only renders str
 - **Grounded answers:** answers come only from tool results, with a link to the source page, and "that's not in my profile" otherwise. A wrong claim shown to an employer does more damage than a refusal.
 - **Defenses against cost and abuse:** a monthly spend limit at the model provider, per-IP rate limiting, a bot check on the widget (e.g. Cloudflare Turnstile), a cap on turns per conversation, prompt caching of the system prompt and tool definitions, and a system prompt scoped to the deployment's subject.
 - **Transcript logging** as an option, with a notice in the widget.
-
-TODO: whether the chat's system prompt is the public bundle's `instructions` or a chat-specific prompt layered on top of them.
-
-TODO: whether Kemian also ships the widget (e.g. as a web component), or only the backend.
 
 ## Template
 
@@ -228,7 +222,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 | --------------- | -------------------------------------------------------------- |
 | Package manager | pnpm, pinned with `packageManager`                             |
 | Runtime         | Node 24                                                        |
-| Monorepo        | Nx: explicit targets, caching, `affected`, and `nx release`    |
+| Monorepo        | Nx: explicit targets, caching, and `affected`                  |
 | Type checking   | TypeScript 7, patched by `@effect/tsgo` for Effect diagnostics |
 | Lint            | Oxlint, type-aware                                             |
 | Format          | Oxfmt                                                          |
@@ -242,32 +236,7 @@ A ready-to-deploy starter project: a ~20-line Worker entry, a Wrangler config de
 - tsdown can't emit declarations with TypeScript 7, which has no JS API, so `tsc` emits them. For the same reason `nx release`, which needs `@nx/js`, isn't used: releases are a manual pnpm version-and-publish for now.
 - Vite+ isn't used yet: its task runner duplicates Nx, and it pins tool versions the Cloudflare tooling doesn't support yet. It wraps the same tools, so switching later is cheap.
 
-## Milestones
-
-- **M0, workspace:** the tooling above, coding conventions, CI, and the fixture knowledge base.
-- **M1, public MVP on Cloudflare:** the `protocol`, `bundler`, `core`, and `cloudflare` modules; the anonymous level only; `apps/demo` deployed to `workers.dev`. Done when Claude web, connected anonymously to the demo, answers from the fixture knowledge base. Everything but the deployment works and is tested locally.
-- **M2, private level:** the Workers OAuth Provider with GitHub login, `?access=<level>`, and the identity-to-level mapping. Works and is tested locally against a fake GitHub.
-- **M3, first real deployment:** publish `@kemian/server` 0.x; the author's content repo runs `kemian publish` in CI and the author deploys a Worker. The package builds and packs, and a test installs the packed result and runs it. Licensed Apache-2.0. TODO: pick the Cloudflare account before deploying.
-- **M4, chat backend:** a chat module adding a `/chat` route.
-- **M5, template:** the template and Deploy button, then splitting modules into packages once their boundaries hold.
-
-## Later
-
-- Replace `?access=<level>` with MCP step-up authorization (403 `insufficient_scope`) once clients handle it. Claude Code had open bugs on this as of 2026-10-20 ([#44652](https://github.com/anthropics/claude-code/issues/44652), [#68720](https://github.com/anthropics/claude-code/issues/68720)).
-- Pulling bundle sets from GitHub Actions artifacts, as an alternative to pushing.
-- A `propose_edit` tool that opens a pull request on the content repo, with the bundler's check run on the PR.
-- Semantic search.
-- Encryption of non-public bundles, only if bundles ever need storage more visible than their source.
-
-## Open questions
-
-- TODO: Which clients to support besides Claude and the chat widget. ChatGPT may need tools named `search` and `fetch` with specific shapes (unverified).
-- TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing.
-- TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast). Line-based parsing doesn't recognize indented code blocks, so tags in them count as markup, which errs toward hiding.
-- TODO: Whether non-Markdown files (images, PDFs) are ever bundled. For now only Markdown is.
-- TODO: How search fits the Workers free tier's 10 ms of CPU per request. Measured on 2026-10-25 in Node with synthetic files of about 3.7 KiB: parsing and decoding a bundle takes under 5 ms even at 1,000 files, but building the MiniSearch index takes 15 ms at 100 files, 60 ms at 300, and 160 ms at 1,000, while loading a prebuilt index takes 1 to 6 ms. The index is built lazily on the first search per Worker instance, so `list` and `read` never pay for it. Options: the paid plan, or building the index ahead of time (in the bundler, or at publish).
-
-## Prior art
+## Prior Art
 
 Researched 2026-10-20 from search results and READMEs; the code wasn't read. Nothing found combines tiered access, inline privacy markup, and a generic bundle format.
 
