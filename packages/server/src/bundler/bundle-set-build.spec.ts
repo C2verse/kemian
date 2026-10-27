@@ -247,6 +247,11 @@ describe('configuration', () => {
     expect(fileIn(result, 'private', 'b.md')).not.toHaveProperty('url');
   });
 
+  it('leaves out the search index when asked to', () => {
+    const result = buildFrom({ 'a.md': 'a' }, { searchIndex: false });
+    expect(bundleOf(result, 'private')).not.toHaveProperty('search');
+  });
+
   it('strips tags in visible content when markers are stripped', () => {
     const result = buildFrom({ 'a.md': 'a <private>b</private>' }, { markers: 'strip' });
     expect(fileIn(result, 'private', 'a.md')?.content).toBe('a b');

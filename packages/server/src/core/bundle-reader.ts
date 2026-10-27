@@ -1,6 +1,5 @@
-import MiniSearch from 'minisearch';
-
 import type { Bundle, BundleFile } from '../protocol/index.ts';
+import { loadSearchIndex, type SearchIndex } from '../search/index.ts';
 
 /**
  * Entry of a folder listing.
@@ -31,7 +30,7 @@ const SNIPPET_RADIUS = 100;
 export class BundleReader {
   readonly #filesByPath: ReadonlyMap<string, BundleFile>;
   readonly #folderSummaries: ReadonlyMap<string, string | undefined>;
-  #index: MiniSearch<BundleFile> | undefined;
+  #index: SearchIndex | undefined;
 
   readonly bundle: Bundle;
 
@@ -93,29 +92,20 @@ export class BundleReader {
 
   /**
    * Searches titles, summaries, paths, and content by keyword, best matches first.
+   *
+   * The first search loads the bundle's prebuilt index, or builds one when the bundle has none.
    */
   search(query: string, options: { readonly limit: number }): SearchHit[] {
-    return this.#getIndex()
+    this.#index ??= loadSearchIndex(this.bundle);
+    return this.#index
       .search(query)
       .slice(0, options.limit)
-      .flatMap((result) => {
-        const file = this.#filesByPath.get(String(result.id));
+      .flatMap((match) => {
+        const file = this.#filesByPath.get(match.path);
         return file === undefined
           ? []
-          : [{ file, score: result.score, snippet: snippetOf(file.content, result.terms) }];
+          : [{ file, score: match.score, snippet: snippetOf(file.content, match.terms) }];
       });
-  }
-
-  #getIndex(): MiniSearch<BundleFile> {
-    if (this.#index !== undefined) return this.#index;
-    const index = new MiniSearch<BundleFile>({
-      idField: 'path',
-      fields: ['path', 'title', 'summary', 'content'],
-      searchOptions: { boost: { title: 3, summary: 2, path: 1.5 }, prefix: true, fuzzy: 0.2 },
-    });
-    index.addAll([...this.bundle.files]);
-    this.#index = index;
-    return index;
   }
 }
 

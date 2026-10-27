@@ -39,6 +39,7 @@ For the MVP, everything ships in one package, `@kemian/server`, organized into m
 | Module       | Export                      | Responsibility                                                                                                                                                                      | Later package               |
 | ------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
 | `protocol`   | `@kemian/server/protocol`   | The bundle schema, its types, the version check, and the generated JSON Schema. The contract every other module depends on.                                                         | `@kemian/protocol`          |
+| `search`     | `@kemian/server/search`     | The search index: built ahead of time by the bundler and loaded by the server.                                                                                                      | `@kemian/search`            |
 | `bundler`    | `@kemian/server/bundler`    | Parses the privacy markup and builds a bundle set from a folder of Markdown. Ships the `kemian` CLI (`build`, `check`, `publish`). Runs on Node.                                    | `@kemian/bundler-markdown`  |
 | `core`       | `@kemian/server/core`       | Platform-neutral logic on web-standard `Request` and `Response`: the `BundleStore` interface, publishing, level resolution, search, and the MCP tools. No platform or service APIs. | `@kemian/core`              |
 | `cloudflare` | `@kemian/server/cloudflare` | Wires core into a Cloudflare Worker: routes, the MCP handler, the OAuth provider, and a `BundleStore` on R2.                                                                        | `@kemian/server-cloudflare` |
@@ -48,7 +49,7 @@ The chat backend (M4) will be another module.
 
 Module rules, enforced by Oxlint:
 
-- `protocol` imports no other module. `bundler` and `core` import only `protocol`. `cloudflare` and `github` import `core` and `protocol`. Nothing imports `cloudflare` or `github`; a deployment passes `githubSignIn(…)` to the Worker as a `SignInProvider`.
+- `protocol` imports no other module. `search` imports only `protocol`. `bundler` and `core` import `protocol` and `search`. `cloudflare` and `github` import `core` and `protocol`. Nothing imports `cloudflare` or `github`; a deployment passes `githubSignIn(…)` to the Worker as a `SignInProvider`.
 - Modules import each other only through their `index.ts`.
 - Service-specific code lives in its own module behind an interface defined in `core`.
 
@@ -70,7 +71,7 @@ The implementation uses [Effect](https://effect.website) v4: typed errors for ev
 
 - The server knows nothing about a content repo's layout, frontmatter, or markup. It only reads bundles.
 - Redaction happens in the bundler, before the server sees content. A server bug can expose at most the bundle the caller's level maps to.
-- Bundles hold content only. The server builds its search index from a bundle at load time.
+- Bundles hold content, plus an optional search index built from that bundle's own files.
 - `instructions` carry the guidance for that level, so every client gets the same guidance.
 
 Protocol version 1:
@@ -81,6 +82,7 @@ interface Bundle {
   level: string;
   build: { id: string; createdAt: string; source?: string }; // source: e.g. a commit SHA
   instructions?: string;
+  search?: { format: string; data: unknown }; // prebuilt search index of this bundle's files
   folders: { path: string; summary?: string }[]; // '' is the root
   files: {
     path: string; // POSIX, relative, unique, no leading '/', no '..'
@@ -106,6 +108,7 @@ interface BundleSet {
 - **Compatibility:** adding an optional field keeps the protocol version; any other change increments it. Readers drop fields they don't know. The server rejects a protocol version it doesn't support and keeps its current build.
 - **The JSON Schema covers structure only.** Unique paths, unique levels, and matching build IDs can't be expressed in JSON Schema; the decoder checks them.
 - **No transformations in protocol schemas.** Wire types are plain JSON, so the generated JSON Schema matches the wire format exactly. Conversions happen inside the code.
+- **The search index ships in the bundle** (decided 2026-10-26). The bundler builds a MiniSearch index from each level's own redacted files, so it holds no term that level may not see. `format` names the engine and indexed fields; a reader that doesn't know the format, or can't load the data, builds its own index from the files, so other bundlers can leave it out. It roughly doubles a bundle's size. Measured in Node with 300 synthetic files, a cold first search (parsing, decoding, and loading) dropped from 121 ms to 21 ms, and from 36 ms to 13 ms at 100 files.
 - **The generated JSON Schema is checked in.** CI fails when it changes unintentionally, so the contract only changes deliberately.
 
 ## Privacy markup
@@ -135,6 +138,7 @@ export default defineConfig({
 });
 ```
 
+- `searchIndex: false` leaves the prebuilt index out of bundles.
 - Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns something unexpected drops the file too.
 - The CLI is `kemian check`, `kemian build` (to `dist/kemian/bundle-set.json`), and `kemian publish` (to a server's `/publish`, with the token from `KEMIAN_PUBLISH_TOKEN`); each exits with code 1 when there are errors.
 
@@ -172,7 +176,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - One `/mcp` endpoint. Tools are named by action:
   - `list(path)`: a folder's entries with their summaries.
   - `read(paths)`: one or more files per call, to cut round trips.
-  - `search(query)`: keyword search over the caller's bundle, with MiniSearch. The index is cached per Worker instance and build.
+  - `search(query)`: keyword search over the caller's bundle, with the bundle's prebuilt MiniSearch index, or one built on the first search when the bundle has none. The index is cached per Worker instance and build.
 - **The credential decides the level.** No token resolves to the configured anonymous level (`public` by default, or none to require login). A token resolves to an identity, and configuration maps it to a level. A caller with no matching level sees nothing. The level is resolved on every request, so configuration changes apply immediately.
 - **`/mcp?access=<level>` triggers a login.** Clients like Claude web only start OAuth after a 401, and an endpoint that accepts anonymous requests never sends one. The argument only makes the server demand a login; the token alone decides what a request sees.
 - **Read-only** in v1.

@@ -39,6 +39,8 @@ export interface KemianConfig {
   };
   /** Whether bundles keep the tags around content they may see. Defaults to `keep`. */
   readonly markers?: 'keep' | 'strip';
+  /** Whether each bundle ships a prebuilt search index, so servers don't build one. Defaults to `true`. */
+  readonly searchIndex?: boolean;
   /** File with each level's instructions for agents, relative to the root. */
   readonly instructions?: Readonly<Record<string, string>>;
   /** Returns whether a file goes into a level's bundle; it can only leave files out. */
@@ -64,6 +66,7 @@ export interface ResolvedConfig {
   };
   readonly keep: readonly string[];
   readonly markers: 'keep' | 'strip';
+  readonly searchIndex: boolean;
   readonly instructions: ReadonlyMap<Level, string>;
   readonly filter: (file: BundleFileCandidate) => boolean;
   readonly url: (file: { readonly level: string; readonly path: string }) => string | undefined;
@@ -102,6 +105,7 @@ const ConfigData = Schema.Struct({
     }),
   ),
   markers: Schema.optionalKey(Schema.Literals(['keep', 'strip'])),
+  searchIndex: Schema.optionalKey(Schema.Boolean),
   instructions: Schema.optionalKey(Schema.Record(Level, Schema.NonEmptyString)),
 });
 const formatIssue = SchemaIssue.makeFormatterDefault();
@@ -144,6 +148,7 @@ export const resolveConfig = (config: unknown): Effect.Effect<ResolvedConfig, In
       },
       keep: data.frontmatter?.keep ?? [],
       markers: data.markers ?? 'keep',
+      searchIndex: data.searchIndex ?? true,
       instructions: new Map(Object.entries(data.instructions ?? {})),
       filter,
       url,

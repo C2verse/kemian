@@ -69,6 +69,17 @@ export const BundleFile = Schema.Struct({
 export type BundleFile = typeof BundleFile.Type;
 
 /**
+ * Search index built ahead of time from a bundle's own files.
+ *
+ * `format` names the engine and its options; a reader that doesn't know the format builds its own index instead.
+ */
+export const BundleSearchIndex = Schema.Struct({
+  format: Schema.NonEmptyString,
+  data: Schema.Unknown,
+}).annotate({ identifier: 'BundleSearchIndex' });
+export type BundleSearchIndex = typeof BundleSearchIndex.Type;
+
+/**
  * Everything one level may see from one build.
  */
 export const Bundle = Schema.Struct({
@@ -76,6 +87,7 @@ export const Bundle = Schema.Struct({
   level: Level,
   build: BuildInfo,
   instructions: Schema.optionalKey(Schema.String),
+  search: Schema.optionalKey(BundleSearchIndex),
   folders: Schema.Array(BundleFolder).check(
     Schema.makeFilter((folders) => isEachUnique(folders.map((folder) => folder.path)), {
       expected: 'folders with unique paths',

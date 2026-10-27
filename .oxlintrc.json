@@ -48,6 +48,8 @@
             "patterns": [
               {
                 "group": [
+                  "../search",
+                  "../search/*",
                   "../bundler",
                   "../bundler/*",
                   "../core",
@@ -69,6 +71,38 @@
       }
     },
     {
+      "files": ["packages/server/src/search/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../protocol",
+                  "../protocol/*",
+                  "!../protocol/index.ts",
+                  "../bundler",
+                  "../bundler/*",
+                  "../core",
+                  "../core/*",
+                  "../cloudflare",
+                  "../cloudflare/*",
+                  "../github",
+                  "../github/*"
+                ],
+                "message": "search imports only protocol, through its index.ts."
+              },
+              {
+                "group": ["node:*"],
+                "message": "search uses no platform APIs."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/server/src/bundler/**"],
       "rules": {
         "no-restricted-imports": [
@@ -80,6 +114,9 @@
                   "../protocol",
                   "../protocol/*",
                   "!../protocol/index.ts",
+                  "../search",
+                  "../search/*",
+                  "!../search/index.ts",
                   "../core",
                   "../core/*",
                   "../cloudflare",
@@ -87,7 +124,7 @@
                   "../github",
                   "../github/*"
                 ],
-                "message": "bundler imports only protocol, through its index.ts."
+                "message": "bundler imports only protocol and search, through their index.ts."
               }
             ]
           }
@@ -106,6 +143,9 @@
                   "../protocol",
                   "../protocol/*",
                   "!../protocol/index.ts",
+                  "../search",
+                  "../search/*",
+                  "!../search/index.ts",
                   "../bundler",
                   "../bundler/*",
                   "../cloudflare",
@@ -113,7 +153,7 @@
                   "../github",
                   "../github/*"
                 ],
-                "message": "core imports only protocol, through its index.ts."
+                "message": "core imports only protocol and search, through their index.ts."
               },
               {
                 "group": ["node:*"],
@@ -136,6 +176,8 @@
                   "../protocol",
                   "../protocol/*",
                   "!../protocol/index.ts",
+                  "../search",
+                  "../search/*",
                   "../bundler",
                   "../bundler/*",
                   "../core",
@@ -144,7 +186,7 @@
                   "../github",
                   "../github/*"
                 ],
-                "message": "cloudflare imports only core and protocol, through their index.ts."
+                "message": "cloudflare imports only protocol and core, through their index.ts."
               }
             ]
           }
@@ -163,6 +205,8 @@
                   "../protocol",
                   "../protocol/*",
                   "!../protocol/index.ts",
+                  "../search",
+                  "../search/*",
                   "../bundler",
                   "../bundler/*",
                   "../core",
@@ -171,7 +215,7 @@
                   "../cloudflare",
                   "../cloudflare/*"
                 ],
-                "message": "github imports only core and protocol, through their index.ts."
+                "message": "github imports only protocol and core, through their index.ts."
               },
               {
                 "group": ["node:*"],

@@ -10,6 +10,7 @@ import type {
   BundleSet,
   Level,
 } from '../protocol/index.ts';
+import { buildSearchIndex } from '../search/index.ts';
 import type { ResolvedConfig } from './config.ts';
 import { type FrontmatterSplit, splitFrontmatter } from './frontmatter.ts';
 import { extractHeading1, extractLinkTargets } from './markdown.ts';
@@ -191,6 +192,7 @@ class BundleSetBuilder {
       level,
       build: this.#buildInfo,
       ...(instructions === undefined ? {} : { instructions }),
+      ...(this.#config.searchIndex ? { search: buildSearchIndex(files) } : {}),
       folders: this.#foldersFor(files),
       files,
     };

@@ -19,6 +19,7 @@
   "sideEffects": false,
   "exports": {
     "./protocol": "./src/protocol/index.ts",
+    "./search": "./src/search/index.ts",
     "./bundler": "./src/bundler/index.ts",
     "./core": "./src/core/index.ts",
     "./cloudflare": "./src/cloudflare/index.ts",
@@ -33,6 +34,10 @@
       "./protocol": {
         "types": "./dist/types/src/protocol/index.d.ts",
         "default": "./dist/protocol/index.js"
+      },
+      "./search": {
+        "types": "./dist/types/src/search/index.d.ts",
+        "default": "./dist/search/index.js"
       },
       "./bundler": {
         "types": "./dist/types/src/bundler/index.d.ts",

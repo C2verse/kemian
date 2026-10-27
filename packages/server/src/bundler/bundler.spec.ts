@@ -4,6 +4,7 @@ import { describe, expect, it } from '@effect/vitest';
 import { Effect } from 'effect';
 
 import { decodeBundleSet } from '../protocol/index.ts';
+import { SEARCH_INDEX_FORMAT } from '../search/index.ts';
 import { buildBundleSet, ConfigLoadError } from './bundler.ts';
 
 const fixtureConfig = fileURLToPath(
@@ -23,11 +24,22 @@ const privateFacts = [
   'atlas.md',
   'December',
   'recruiter',
-  'Tidepool',
+  'peer-to-peer cache',
 ];
 const excludedFacts = ['meetup-talk-transcript', 'everyone thinks'];
 
+const isIn = (bundle: string | undefined, fact: string) =>
+  bundle?.toLowerCase().includes(fact.toLowerCase()) ?? false;
+
 describe('buildBundleSet', () => {
+  it('ships a search index built from each bundle', async () => {
+    const { bundleSet } = await buildBundleSet({ configPath: fixtureConfig });
+    for (const bundle of bundleSet.bundles) {
+      expect(bundle.search?.format).toBe(SEARCH_INDEX_FORMAT);
+      expect(JSON.stringify(bundle.search)).toContain('lantern');
+    }
+  });
+
   it('builds the fixture knowledge base without problems', async () => {
     const { bundleSet, problems } = await buildBundleSet({ configPath: fixtureConfig });
     expect(problems).toEqual([]);
@@ -37,10 +49,10 @@ describe('buildBundleSet', () => {
   it('keeps every private fact out of the public bundle', async () => {
     const { bundleSet } = await buildBundleSet({ configPath: fixtureConfig });
     const [publicBundle, privateBundle] = bundleSet.bundles.map((bundle) => JSON.stringify(bundle));
-    expect(privateFacts.filter((fact) => publicBundle?.includes(fact))).toEqual([]);
-    expect(privateFacts.filter((fact) => !privateBundle?.includes(fact))).toEqual([]);
+    expect(privateFacts.filter((fact) => isIn(publicBundle, fact))).toEqual([]);
+    expect(privateFacts.filter((fact) => !isIn(privateBundle, fact))).toEqual([]);
     expect(
-      excludedFacts.filter((fact) => publicBundle?.includes(fact) || privateBundle?.includes(fact)),
+      excludedFacts.filter((fact) => isIn(publicBundle, fact) || isIn(privateBundle, fact)),
     ).toEqual([]);
   });
 

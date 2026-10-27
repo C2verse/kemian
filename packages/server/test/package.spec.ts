@@ -50,12 +50,17 @@ describe('packed @kemian/server', () => {
     await expect(access(join(packed, 'schema/bundle-set.v1.schema.json'))).resolves.toBeUndefined();
   });
 
-  it.each(['protocol', 'bundler', 'core', 'github'])('imports the %s entry', async (name) => {
-    const module: unknown = await import(pathToFileURL(join(packed, `dist/${name}/index.js`)).href);
-    expect(
-      typeof module === 'object' && module !== null ? Object.keys(module).length : 0,
-    ).toBeGreaterThan(0);
-  });
+  it.each(['protocol', 'search', 'bundler', 'core', 'github'])(
+    'imports the %s entry',
+    async (name) => {
+      const module: unknown = await import(
+        pathToFileURL(join(packed, `dist/${name}/index.js`)).href
+      );
+      expect(
+        typeof module === 'object' && module !== null ? Object.keys(module).length : 0,
+      ).toBeGreaterThan(0);
+    },
+  );
 
   it('runs the kemian binary', async () => {
     const { stderr } = await run('node', [join(packed, manifest.bin['kemian'] ?? ''), 'check'], {

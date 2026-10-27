@@ -3,6 +3,7 @@ import { defineConfig } from 'tsdown';
 export default defineConfig({
   entry: {
     'protocol/index': 'src/protocol/index.ts',
+    'search/index': 'src/search/index.ts',
     'bundler/index': 'src/bundler/index.ts',
     'bundler/cli': 'src/bundler/cli.ts',
     'core/index': 'src/core/index.ts',
