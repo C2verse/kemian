@@ -5,12 +5,10 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    // Sign-in is enabled when the GitHub OAuth app's ID is set here and its secret is set as a secret.
-    "GITHUB_CLIENT_ID": "",
+    "GITHUB_CLIENT_ID": "Ov23libQayGUbDiz0gu9",
     "GITHUB_BASE_URL": "https://github.com",
     "GITHUB_API_BASE_URL": "https://api.github.com",
-    // Comma-separated identities allowed into the private level, e.g. "github:12345".
-    "PRIVATE_IDENTITIES": "",
+    "PRIVATE_IDENTITIES": "github:63489409",
   },
   "secrets": {
     "required": ["KEMIAN_PUBLISH_TOKEN", "GITHUB_CLIENT_SECRET"],
