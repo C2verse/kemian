@@ -39,7 +39,7 @@ A file the caller's level can't see reads as "Not found.", exactly like a missin
 
 ## Status
 
-**working.** Tested with the official MCP client, including 2025-era clients; not yet tried with Claude web.
+**working.** Tested with the official MCP client, including 2025-era clients, and with Claude web and Claude Code against the deployed demo.
 
 Known gaps:
 

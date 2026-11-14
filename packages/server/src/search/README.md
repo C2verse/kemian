@@ -6,7 +6,7 @@ The search index that ships in each bundle. The bundler builds it from one level
 
 - **`buildSearchIndex(files)`**: the `BundleSearchIndex` to put in a bundle, as plain JSON.
 - **`loadSearchIndex(bundle)`**: a `SearchIndex` whose `search(query)` returns `SearchMatch`es (path, score, matched terms), best first. It never throws.
-- **`SEARCH_INDEX_FORMAT`**: the format this code writes and reads, naming the engine and the indexed fields.
+- **`SEARCH_INDEX_FORMAT`**: the format this code writes and reads, naming the engine, the indexed fields, and how text splits into terms.
 
 It's exported so bundlers other than Kemian's can ship compatible indexes.
 
@@ -18,7 +18,7 @@ It's exported so bundlers other than Kemian's can ship compatible indexes.
 
 ## Status
 
-**working.** MiniSearch 7, indexing `path`, `title`, `summary`, and `content`.
+**working.** MiniSearch 7, indexing `path`, `title`, `summary`, and `content`. Numbers like `110,000` stay one term and match only exactly; words of 4 letters or more also match by prefix and with a typo.
 
 Known gaps:
 

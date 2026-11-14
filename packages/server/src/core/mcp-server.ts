@@ -188,11 +188,17 @@ const formatMetadata = (file: BundleFile): string =>
     ['Updated', file.updated],
     ['URL', file.url],
     ['Visibility', file.visibility],
-    ...Object.entries(file.meta ?? {}).map(([key, value]) => [key, JSON.stringify(value)] as const),
+    ...Object.entries(file.meta ?? {}).map(
+      ([key, value]) => [key, formatMetaValue(value)] as const,
+    ),
   ]
     .filter((entry): entry is readonly [string, string] => entry[1] !== undefined)
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n');
+
+// A string with a line break stays JSON-encoded, so it can't pass for further metadata lines.
+const formatMetaValue = (value: unknown): string =>
+  typeof value === 'string' && !/[\n\r]/u.test(value) ? value : JSON.stringify(value);
 
 const searchFiles = (reader: BundleReader, query: string, limit: number): string => {
   const hits = reader.search(query, { limit });

@@ -93,7 +93,7 @@ describe('MCP', () => {
     const lantern = await callTool(client, 'read', { paths: ['projects/lantern.md'] });
     expect(lantern).toContain('Updated: 2026-10-12');
     expect(lantern).toContain('URL: https://example.com/projects/lantern.md');
-    expect(lantern).toContain('status: "stable"');
+    expect(lantern).toContain('status: stable\n');
   });
 
   it('rejects invalid tool arguments', async () => {

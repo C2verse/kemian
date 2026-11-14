@@ -175,6 +175,8 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
   - `list(path)`: a folder's entries with their summaries.
   - `read(paths)`: one or more files per call, to cut round trips.
   - `search(query)`: keyword search over the caller's bundle, with the bundle's prebuilt MiniSearch index, or one built on the first search when the bundle has none. The index is cached per Worker instance and build.
+- **Search matches numbers exactly** (decided 2026-11-14). A comma or period between digits stays in the term, so `110,000` is one term, and terms with digits get no prefix or typo matching. Typo matching also skips words under 4 letters. Loose matching of short terms made a search for `110,000` return files containing only `000` or `10`.
+- **Clients:** Claude (web and Code) is tested against the deployed demo, and ChatGPT will be supported too (decided 2026-11-14).
 - **The credential decides the level.** No token resolves to the configured anonymous level (`public` by default, or none to require login). A token resolves to an identity, and configuration maps it to a level. A caller with no matching level sees nothing. The level is resolved on every request, so configuration changes apply immediately.
 - **`/mcp?access=<level>` triggers a login.** Clients like Claude web only start OAuth after a 401, and an endpoint that accepts anonymous requests never sends one. The argument only makes the server demand a login; the token alone decides what a request sees.
 - **Read-only** in v1.

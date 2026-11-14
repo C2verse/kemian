@@ -2,7 +2,7 @@
 
 Serve one Markdown knowledge base to different audiences over MCP. Mark private content inline, build a redacted bundle for each access level, and let each AI client see only the level its credential maps to.
 
-**Status:** 0.x, working and tested locally but not yet deployed; APIs may change before 1.0.
+**Status:** 0.x, working and running in a demo deployment, but not yet released; APIs may change before 1.0.
 
 Everything ships in this package for now, as separate entry points:
 

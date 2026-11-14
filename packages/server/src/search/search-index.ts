@@ -7,12 +7,28 @@ import type { Bundle, BundleFile, BundleSearchIndex } from '../protocol/index.ts
  *
  * Change it whenever the indexed fields or the engine's serialization change, so readers rebuild stale indexes.
  */
-export const SEARCH_INDEX_FORMAT = 'minisearch-7/path,title,summary,content';
+export const SEARCH_INDEX_FORMAT = 'minisearch-7/path,title,summary,content/grouped-numbers';
+
+// Like MiniSearch's default separator, but a comma or period between two digits stays in the term,
+// so `110,000` is one term instead of `110` and `000`.
+const TERM_SEPARATOR = /(?:(?<!\d)[.,]|[.,](?!\d)|(?![.,])[\n\r\p{Z}\p{P}])+/u;
+
+const MIN_FUZZY_TERM_LENGTH = 4;
+
+const splitTerms = (text: string): string[] =>
+  text.split(TERM_SEPARATOR).filter((term) => term !== '');
+
+const hasDigit = (term: string): boolean => /\d/u.test(term);
 
 const INDEX_OPTIONS: Options<BundleFile> = {
   idField: 'path',
   fields: ['path', 'title', 'summary', 'content'],
-  searchOptions: { boost: { title: 3, summary: 2, path: 1.5 }, prefix: true, fuzzy: 0.2 },
+  tokenize: splitTerms,
+  searchOptions: {
+    boost: { title: 3, summary: 2, path: 1.5 },
+    prefix: (term) => !hasDigit(term),
+    fuzzy: (term) => (hasDigit(term) || term.length < MIN_FUZZY_TERM_LENGTH ? false : 0.2),
+  },
 };
 
 /**

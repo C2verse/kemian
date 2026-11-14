@@ -31,10 +31,21 @@ and point an MCP client at `http://localhost:5173/mcp`.
 
 ## Deploying
 
-1. `npx wrangler login`.
-2. `pnpm exec nx deploy demo`, which builds with Vite and deploys with Wrangler. If Wrangler doesn't create the R2 bucket and KV namespace itself, create them with `npx wrangler r2 bucket create kemian-demo-bundles` and `npx wrangler kv namespace create OAUTH_KV`, and add the namespace's ID to `wrangler.jsonc`.
-3. `npx wrangler secret put KEMIAN_PUBLISH_TOKEN` in `apps/demo`, then publish the fixture with `--url https://<worker>`.
-4. For sign-in, create a GitHub OAuth app with the callback URL `https://<worker>/callback`, set `GITHUB_CLIENT_ID` and `PRIVATE_IDENTITIES`, and put `GITHUB_CLIENT_SECRET` as a secret.
+1. Once per Cloudflare account: turn on R2 in the dashboard (it asks for a payment method even on the free tier), then run `npx wrangler login`.
+2. Write both required secrets to a file outside the repository. Wrangler refuses to create a Worker whose required secrets aren't set, and `wrangler secret put` only works once the Worker exists:
+
+   ```sh
+   umask 077
+   printf 'KEMIAN_PUBLISH_TOKEN=%s\nGITHUB_CLIENT_SECRET=unset\n' "$(openssl rand -base64 32)" > ~/kemian-demo.secrets
+   ```
+
+   `unset` is a placeholder until sign-in is set up.
+
+3. Deploy the first time with `pnpm exec nx deploy demo -- --secrets-file ~/kemian-demo.secrets`. It builds with Vite, creates the R2 bucket (and the KV namespace, when `wrangler.jsonc` has no ID for it), and prints the Worker's URL. Later deploys need no flag. Wrangler also logs each run in `~/.config/.wrangler/logs/`.
+4. Publish the fixture as above, with `--url https://<worker>` and the token from the secrets file.
+5. For sign-in, create a GitHub OAuth app with the callback URL `https://<worker>/callback`, with wildcard matching and device flow off. Set `GITHUB_CLIENT_ID` and `PRIVATE_IDENTITIES` (`github:` followed by the number from `gh api user --jq .id`) in `wrangler.jsonc`, run `npx wrangler secret put GITHUB_CLIENT_SECRET` in `apps/demo`, and deploy again. Clients sign in through `https://<worker>/mcp?access=private`.
+
+If `publish` fails with `fetch failed` while `curl` reaches the Worker, Node gave up connecting: it allows 250 ms per address, which slow networks such as WSL's can exceed. Set `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=5000`.
 
 ## Tests
 
@@ -45,4 +56,4 @@ Both start the Worker in local `workerd` with Wrangler's `createTestHarness`.
 
 ## Status
 
-**working.** Tested locally; not yet deployed.
+**working.** Deployed, and tested at both levels with Claude web and Claude Code.

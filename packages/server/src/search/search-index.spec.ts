@@ -42,6 +42,38 @@ describe('loadSearchIndex', () => {
     ]);
   });
 
+  describe('matching', () => {
+    const records: BundleFile[] = [
+      { path: 'about/profile.md', content: 'I want at least 110,000 EUR and a map of the city.' },
+      { path: 'about/contact.md', content: 'Phone: +351 900 000 000' },
+      { path: 'journal/2026-10-13.md', content: 'Notes from 2026-10-13, with many details.' },
+    ];
+    const recordsBundle = bundleWith({ files: records, search: buildSearchIndex(records) });
+
+    it('matches a number with separators as one term', () => {
+      expect(pathsFor(recordsBundle, '110,000')).toEqual(['about/profile.md']);
+    });
+
+    it("doesn't match numbers loosely", () => {
+      expect(pathsFor(recordsBundle, '110')).toEqual([]);
+      expect(pathsFor(recordsBundle, '20')).toEqual([]);
+    });
+
+    it('still splits words at punctuation', () => {
+      expect(pathsFor(recordsBundle, 'phone')).toEqual(['about/contact.md']);
+      expect(pathsFor(recordsBundle, '2026')).toEqual(['journal/2026-10-13.md']);
+    });
+
+    it('matches longer words by prefix and with typos', () => {
+      expect(pathsFor(recordsBundle, 'detai')).toEqual(['journal/2026-10-13.md']);
+      expect(pathsFor(recordsBundle, 'detsils')).toEqual(['journal/2026-10-13.md']);
+    });
+
+    it("doesn't match short words with typos", () => {
+      expect(pathsFor(recordsBundle, 'mop')).toEqual([]);
+    });
+  });
+
   it.each([
     ['an unknown format', { format: 'lunr-2', data: buildSearchIndex(files).data }],
     ['malformed data', { format: SEARCH_INDEX_FORMAT, data: { index: 'nope' } }],

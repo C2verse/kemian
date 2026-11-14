@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Kemian stands, what comes next, and what is still undecided. Updated 2026-10-26. Update it in the same change that finishes a step, adds a gap, or settles a question; record a settled question's answer in [design.md](design.md).
+Where Kemian stands, what comes next, and what is still undecided. Updated 2026-11-14. Update it in the same change that finishes a step, adds a gap, or settles a question; record a settled question's answer in [design.md](design.md).
 
 ## Status Vocabulary
 
@@ -15,8 +15,8 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 | Milestone                      | Status           | What's left                                                                                           |
 | ------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- |
 | M0: workspace                  | done             |                                                                                                       |
-| M1: public MVP on Cloudflare   | working locally  | Deploy `apps/demo` and confirm Claude web answers from the fixture as an anonymous connector.         |
-| M2: private level              | working locally  | Create a GitHub OAuth app for the demo and confirm Claude web signs in through `?access=private`.     |
+| M1: public MVP on Cloudflare   | done             |                                                                                                       |
+| M2: private level              | deployed         | Confirm a GitHub account not in `PRIVATE_IDENTITIES` is refused.                                      |
 | M3: first real deployment      | ready to publish | Publish `@kemian/server` 0.1.0, add `kemian publish` to the author's content repo, deploy its Worker. |
 | M4: chat backend               | planned          | Everything: a chat module adding a `/chat` route.                                                     |
 | M5: template and Deploy button | planned          | Everything, then splitting modules into packages once their boundaries hold.                          |
@@ -25,16 +25,15 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 In order:
 
-1. Push `develop` to `C2verse/kemian` as its first branch, so it becomes the default branch, and check that CI passes.
-2. Log Wrangler in (`npx wrangler login`), deploy the demo with `pnpm exec nx deploy demo`, and set its `KEMIAN_PUBLISH_TOKEN` secret.
-3. Publish the fixture to the deployed demo and connect Claude web to `/mcp`. This is the first test with a real client; until then, client compatibility is only known from the protocol tests.
-4. Create a GitHub OAuth app for the demo, set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `PRIVATE_IDENTITIES`, and sign in from Claude web.
-5. Release `@kemian/server` 0.1.0 with the manual release steps.
-6. Run `kemian check` on the author's knowledge base, fix what it reports, then add its config and CI publish step there.
+1. Sign in to the demo's `?access=private` with a GitHub account not in `PRIVATE_IDENTITIES`, and confirm it's refused.
+2. Deploy the demo again and republish the fixture, so it runs the new search matching and its bundles carry an index in the current format.
+3. Release `@kemian/server` 0.1.0 with the manual release steps.
+4. Run `kemian check` on the author's knowledge base, fix what it reports, then add its config and CI publish step there.
 
 ## Open Questions
 
-- TODO: Which clients to support besides Claude and the chat widget. ChatGPT may need tools named `search` and `fetch` with specific shapes (unverified).
+- TODO: What ChatGPT support takes. It may need tools named `search` and `fetch` with specific shapes (unverified).
+- TODO: Whether a level without its own instructions falls back to the nearest lower level's. Now it gets only the generic text, so the demo's private level misses the public guidance.
 - TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing the markup.
 - TODO: Whether Markdown is parsed line by line (as now) or with a Markdown parser (mdast). Line-based parsing doesn't recognize indented code blocks, so tags in them count as markup, which errs toward hiding.
 - TODO: Whether non-Markdown files (images, PDFs) are ever bundled. For now only Markdown is.
@@ -49,6 +48,7 @@ In order:
 - **Prior art isn't read in depth yet.** The projects listed in [design.md](design.md#prior-art) were judged from READMEs only.
 - **Release is manual.** `nx release` needs `@nx/js`, which breaks the Nx project graph on TypeScript 7. Revisit when Nx supports TypeScript 7, or write custom version actions.
 - **Declarations aren't bundled.** tsdown's declaration bundling needs TypeScript 7.1's API; switch to its `tsgo` generator once 7.1 is stable.
+- **The demo's `wrangler.jsonc` holds the author's KV namespace ID.** Wrangler wrote it on the first deploy. Anyone else deploying the demo, or the template made from it, must remove it so Wrangler creates their own.
 - **Sign-in is only covered end to end.** `cloudflare/oauth.ts` runs only in `workerd`, so the demo's tests cover it, with no unit tests.
 
 ## Later
