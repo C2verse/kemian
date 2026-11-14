@@ -12,14 +12,14 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 ## Milestones
 
-| Milestone                      | Status           | What's left                                                                                           |
-| ------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| M0: workspace                  | done             |                                                                                                       |
-| M1: public MVP on Cloudflare   | done             |                                                                                                       |
-| M2: private level              | deployed         | Confirm a GitHub account not in `PRIVATE_IDENTITIES` is refused.                                      |
-| M3: first real deployment      | ready to publish | Publish `@kemian/server` 0.1.0, add `kemian publish` to the author's content repo, deploy its Worker. |
-| M4: chat backend               | planned          | Everything: a chat module adding a `/chat` route.                                                     |
-| M5: template and Deploy button | planned          | Everything, then splitting modules into packages once their boundaries hold.                          |
+| Milestone                      | Status   | What's left                                                                  |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------- |
+| M0: workspace                  | done     |                                                                              |
+| M1: public MVP on Cloudflare   | done     |                                                                              |
+| M2: private level              | deployed | Confirm a GitHub account not in `PRIVATE_IDENTITIES` is refused.             |
+| M3: first real deployment      | released | Add `kemian publish` to the author's content repo and deploy its Worker.     |
+| M4: chat backend               | planned  | Everything: a chat module adding a `/chat` route.                            |
+| M5: template and Deploy button | planned  | Everything, then splitting modules into packages once their boundaries hold. |
 
 ## Next Steps
 
@@ -27,8 +27,7 @@ In order:
 
 1. Sign in to the demo's `?access=private` with a GitHub account not in `PRIVATE_IDENTITIES`, and confirm it's refused.
 2. Deploy the demo again and republish the fixture, so it runs the new search matching and its bundles carry an index in the current format.
-3. Release `@kemian/server` 0.1.0 with the manual release steps.
-4. Run `kemian check` on the author's knowledge base, fix what it reports, then add its config and CI publish step there.
+3. Run `kemian check` on the author's knowledge base, fix what it reports, then add its config and CI publish step there.
 
 ## Open Questions
 
