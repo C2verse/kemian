@@ -12,8 +12,22 @@
     // Comma-separated identities allowed into the private level, e.g. "github:12345".
     "PRIVATE_IDENTITIES": "",
   },
-  "secrets": { "required": ["KEMIAN_PUBLISH_TOKEN", "GITHUB_CLIENT_SECRET"] },
-  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "kemian-demo-bundles" }],
-  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
-  "observability": { "enabled": true },
+  "secrets": {
+    "required": ["KEMIAN_PUBLISH_TOKEN", "GITHUB_CLIENT_SECRET"],
+  },
+  "r2_buckets": [
+    {
+      "binding": "BUNDLES",
+      "bucket_name": "kemian-demo-bundles",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "7477c7ed59374a808482dc356fd3be44",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
 }
