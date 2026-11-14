@@ -37,3 +37,5 @@ Known gaps:
 - Parsing is line based, so it doesn't recognize indented code blocks: tags in them count as markup, which errs toward hiding.
 - Only Markdown files are bundled.
 - A link to a file that exists but is excluded or filtered from a level isn't reported.
+- A link to a file left out for errors is reported as visible only to the highest level, even when the file's own level is lower, so the real error (the file's) is easy to miss.
+- `.gitignore` isn't read: git-ignored output folders such as `dist/` are bundled unless the config excludes them.
