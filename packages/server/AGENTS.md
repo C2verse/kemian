@@ -24,5 +24,6 @@ Manual for now:
 
 1. `pnpm --filter @kemian/server version <x.y.z> --no-git-tag-version`.
 2. Run every check: `pnpm exec nx run-many -t lint typecheck test build`.
-3. Commit "release @kemian/server x.y.z" and tag `server@x.y.z`.
-4. `pnpm --filter @kemian/server publish`, which applies `publishConfig`.
+3. Pack with `pnpm pack`, install the tarball into an empty folder with npm, and run `npx kemian --version` there. The packaging test reuses the workspace's `node_modules`, so only a fresh install catches a dependency range that resolves differently outside the lockfile.
+4. Commit "release @kemian/server x.y.z" and tag `server@x.y.z`.
+5. `pnpm --filter @kemian/server publish`, which applies `publishConfig`.

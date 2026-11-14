@@ -27,8 +27,7 @@ In order:
 
 1. Sign in to the demo's `?access=private` with a GitHub account not in `PRIVATE_IDENTITIES`, and confirm it's refused.
 2. Deploy the demo again and republish the fixture, so it runs the new search matching and its bundles carry an index in the current format.
-3. Release 0.1.1 so the CLI runs after a fresh install (see Known Gaps), and make the packaging test install the packed package on its own.
-4. Deploy the author's Worker, which already has its config, CI publish step, and deploy steps in the content repo.
+3. Deploy the author's Worker, which already has its config, CI publish step, and deploy steps in the content repo.
 
 ## Open Questions
 
@@ -42,7 +41,8 @@ In order:
 
 ## Known Gaps
 
-- **0.1.0's CLI crashes after a fresh install.** `@effect/platform-node` 4.0.6 accepts `@effect/platform-node-shared` `^4.0.6`, which resolves to 4.1.x, and that needs `effect` 4.1 while the package pins 4.0.6. The workspace lockfile holds 4.0.6, and the packaging test reuses the workspace's `node_modules`, so neither catches it. Consumers can override `@effect/platform-node-shared` to 4.0.6 until it's fixed.
+- **0.1.0's CLI crashes after a fresh install; use 0.1.1 or later.** `@effect/platform-node` 4.0.6 accepts any later `@effect/platform-node-shared` 4.x, which needs a newer `effect` than the pinned 4.0.6. From 4.1.4 on, `@effect/platform-node` pins it exactly.
+- **The packaging test doesn't install the package fresh.** It reuses the workspace's `node_modules`, so a fresh install is a manual release step instead. Installing from the registry in a test would need the network.
 - **Search cost on the Workers free tier.** The free tier allows 10 ms of CPU per request. With the prebuilt index, a cold first search measured 13 ms at 100 synthetic files and 21 ms at 300, in Node. It happens once per Worker instance and build. Options: the paid plan, or keeping the index in its own R2 object so only searches load it.
 - **`list` and `read` parse the index too.** The index is part of the bundle, so the first request of any kind in a Worker instance parses it. Storing it separately in R2 would fix this as well.
 - **Client ID Metadata Documents are off.** Enabling them needs the `global_fetch_strictly_public` flag, which would block the end-to-end tests' local fake GitHub; enable them in production configuration if a client requires them.
