@@ -76,12 +76,12 @@ const cookieHeaderOf = (responses: readonly Response[]): string =>
     .map((cookie) => cookie.split(';')[0])
     .join('; ');
 
-const register = async (): Promise<string> => {
+const register = async (options: { readonly clientName?: string } = {}): Promise<string> => {
   const response = await fetch(new URL('register', baseUrl), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      client_name: 'E2E client',
+      client_name: options.clientName ?? 'E2E client',
       redirect_uris: [clientRedirect],
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code', 'refresh_token'],
@@ -92,20 +92,28 @@ const register = async (): Promise<string> => {
   return readString(await response.json(), 'client_id') ?? '';
 };
 
-/** Runs the browser part of the OAuth flow and returns where the Worker finally redirects the client. */
-const authorize = async (options: { readonly githubCode: string; readonly decision?: string }) => {
-  const clientId = await register();
-  const verifier = base64Url(randomBytes(32));
+const authorizeUrlOf = (options: { readonly clientId: string; readonly verifier: string }) => {
   const authorizeUrl = new URL('authorize', baseUrl);
   authorizeUrl.search = new URLSearchParams({
     response_type: 'code',
-    client_id: clientId,
+    client_id: options.clientId,
     redirect_uri: clientRedirect,
-    code_challenge: s256(verifier),
+    code_challenge: s256(options.verifier),
     code_challenge_method: 'S256',
     state: 'client-state',
     resource: new URL('mcp', baseUrl).href,
   }).toString();
+  return authorizeUrl;
+};
+
+/** Runs the browser part of the OAuth flow and returns where the Worker finally redirects the client. */
+const authorize = async (options: {
+  readonly github: { readonly code: string } | { readonly error: string };
+  readonly decision?: string;
+}) => {
+  const clientId = await register();
+  const verifier = base64Url(randomBytes(32));
+  const authorizeUrl = authorizeUrlOf({ clientId, verifier });
 
   const consent = await fetch(authorizeUrl, { redirect: 'manual' });
   expect(consent.status).toBe(200);
@@ -127,7 +135,7 @@ const authorize = async (options: { readonly githubCode: string; readonly decisi
 
   const callbackUrl = new URL('callback', baseUrl);
   callbackUrl.search = new URLSearchParams({
-    code: options.githubCode,
+    ...options.github,
     state: githubAuthorize.searchParams.get('state') ?? '',
   }).toString();
   const callback = await fetch(callbackUrl, {
@@ -234,7 +242,7 @@ describe('sign-in', () => {
   });
 
   it('signs in a listed GitHub user and serves the private level', async () => {
-    const { location, clientId, verifier } = await authorize({ githubCode: 'robin-code' });
+    const { location, clientId, verifier } = await authorize({ github: { code: 'robin-code' } });
     expect(location.origin + location.pathname).toBe(clientRedirect);
     expect(location.searchParams.get('state')).toBe('client-state');
     const accessToken = await exchangeCode({
@@ -252,15 +260,31 @@ describe('sign-in', () => {
   });
 
   it('refuses a GitHub user without a level', async () => {
-    const { location } = await authorize({ githubCode: 'stranger-code' });
+    const { location } = await authorize({ github: { code: 'stranger-code' } });
     expect(location.searchParams.get('error')).toBe('access_denied');
     expect(location.searchParams.get('error_description')).toContain('stranger has no access');
   });
 
-  it('returns access_denied when the user cancels', async () => {
-    const { location } = await authorize({ githubCode: 'robin-code', decision: 'deny' });
+  it('returns access_denied when the user cancels on the consent page', async () => {
+    const { location } = await authorize({ github: { code: 'robin-code' }, decision: 'deny' });
     expect(location.origin + location.pathname).toBe(clientRedirect);
     expect(location.searchParams.get('error')).toBe('access_denied');
+  });
+
+  it('returns access_denied when the user cancels on GitHub', async () => {
+    const { location } = await authorize({ github: { error: 'access_denied' } });
+    expect(location.origin + location.pathname).toBe(clientRedirect);
+    expect(location.searchParams.get('error')).toBe('access_denied');
+    expect(location.searchParams.get('state')).toBe('client-state');
+  });
+
+  it('escapes the name a client registered for itself on the consent page', async () => {
+    const clientId = await register({ clientName: '<img src=x onerror=alert(1)>' });
+    const verifier = base64Url(randomBytes(32));
+    const consent = await fetch(authorizeUrlOf({ clientId, verifier }), { redirect: 'manual' });
+    const page = await consent.text();
+    expect(page).not.toContain('<img');
+    expect(page).toContain('Allow &#60;img src=x onerror=alert(1)&#62; to read');
   });
 
   it('rejects an invalid token', async () => {

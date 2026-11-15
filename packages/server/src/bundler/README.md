@@ -16,7 +16,7 @@ Turns a folder of Markdown with privacy markup into a bundle set, and ships the 
 | --------------------- | ---------------------------------------------------------------------------------------------- |
 | `config.ts`           | `KemianConfig`, `defineConfig`, `resolveConfig`, and the resolved form                         |
 | `bundler.ts`          | `loadConfig`, `buildKnowledgeBase`, and `buildBundleSet`                                       |
-| `source-tree.ts`      | `SourceTree`, read from disk or made from an object                                            |
+| `source-tree.ts`      | `SourceTree`, read from disk (honoring `.gitignore` files) or made from an object              |
 | `frontmatter.ts`      | YAML frontmatter, reporting malformed frontmatter instead of guessing                          |
 | `markup.ts`           | The privacy markup: `parseMarkup` into a tree, `renderMarkup` for one level                    |
 | `markdown.ts`         | Scanning shared by markup and links: code fences, inline code, link targets, the first heading |
@@ -30,12 +30,11 @@ Turns a folder of Markdown with privacy markup into a bundle set, and ships the 
 
 ## Status
 
-**working.** Tested on the fixture and on edge cases of the markup; not yet run on a real knowledge base.
+**stable.** Tested on the fixture and on edge cases of the markup, and publishing the first real deployment's knowledge base.
 
 Known gaps:
 
 - Parsing is line based, so it doesn't recognize indented code blocks: tags in them count as markup, which errs toward hiding.
 - Only Markdown files are bundled.
-- A link to a file that exists but is excluded or filtered from a level isn't reported.
-- A link to a file left out for errors is reported as visible only to the highest level, even when the file's own level is lower, so the real error (the file's) is easy to miss.
-- `.gitignore` isn't read: git-ignored output folders such as `dist/` are bundled unless the config excludes them.
+- Links to folders are checked against the folder's level only: a folder whose files a level can't see, or that are all excluded or filtered, passes as a link target.
+- Link checks see a target's errors from analysis, not the link errors found alongside them, so a file left out for a link error of its own doesn't flag the files linking to it. The first error still fails the build.

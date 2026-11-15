@@ -50,10 +50,10 @@ If `publish` fails with `fetch failed` while `curl` reaches the Worker, Node gav
 ## Tests
 
 - `test/e2e.spec.ts`: publishing the fixture with the real CLI, anonymous MCP access, 2025-era clients, republishing, and CORS.
-- `test/sign-in.spec.ts`: the whole OAuth flow against a fake GitHub: consent, the GitHub redirect with PKCE, the callback, the token, the private level, and refusals.
+- `test/sign-in.spec.ts`: the whole OAuth flow against a fake GitHub: consent, the GitHub redirect with PKCE, the callback, the token, the private level, refusals, cancelling on either page, and escaping a self-registered client's name.
 
 Both start the Worker in local `workerd` with Wrangler's `createTestHarness`.
 
 ## Status
 
-**working.** Deployed, and tested at both levels with Claude web and Claude Code.
+**stable.** Deployed, and tested at both levels with Claude web and Claude Code.

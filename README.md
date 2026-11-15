@@ -4,7 +4,7 @@ Serve one Markdown knowledge base to different audiences over MCP. Private conte
 
 The name is 刻面 (_kèmiàn_), the gemology term for "facet": one body of knowledge, a different face for each viewer.
 
-**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code; the first real deployment is next. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
+**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code, and the first real deployment is live. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
@@ -36,16 +36,16 @@ Terms used across the codebase, each defined in full where it's owned:
 
 ## Components
 
-| Directory                                            | Purpose                                                                                  | Status  |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------- |
-| [packages/server](packages/server/README.md)         | `@kemian/server`: the CLI, bundler, server, and Cloudflare Worker. Use Kemian from here. | working |
-| [packages/server/src](packages/server/src/README.md) | Its six modules and how a request flows through them.                                    | working |
-| [apps/demo](apps/demo/README.md)                     | A Worker serving the fixture knowledge base, with the end-to-end tests.                  | working |
-| [fixtures](fixtures/README.md)                       | The invented knowledge base used by tests and the demo.                                  | stable  |
-| [docs/design.md](docs/design.md)                     | Decisions and their reasons.                                                             |         |
-| [docs/privacy-markup.md](docs/privacy-markup.md)     | The privacy markup spec.                                                                 |         |
-| [docs/roadmap.md](docs/roadmap.md)                   | Milestones, next steps, open questions, and known gaps.                                  |         |
-| [.claude/rules](.claude/rules/)                      | How to work in this repository: tooling, coding, documentation, privacy, tests.          |         |
+| Directory                                            | Purpose                                                                                  | Status |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------ |
+| [packages/server](packages/server/README.md)         | `@kemian/server`: the CLI, bundler, server, and Cloudflare Worker. Use Kemian from here. | stable |
+| [packages/server/src](packages/server/src/README.md) | Its six modules and how a request flows through them.                                    | stable |
+| [apps/demo](apps/demo/README.md)                     | A Worker serving the fixture knowledge base, with the end-to-end tests.                  | stable |
+| [fixtures](fixtures/README.md)                       | The invented knowledge base used by tests and the demo.                                  | stable |
+| [docs/design.md](docs/design.md)                     | Decisions and their reasons.                                                             |        |
+| [docs/privacy-markup.md](docs/privacy-markup.md)     | The privacy markup spec.                                                                 |        |
+| [docs/roadmap.md](docs/roadmap.md)                   | Milestones, next steps, open questions, and known gaps.                                  |        |
+| [.claude/rules](.claude/rules/)                      | How to work in this repository: tooling, coding, documentation, privacy, tests.          |        |
 
 ## First Deployment
 

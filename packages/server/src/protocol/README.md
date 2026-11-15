@@ -23,7 +23,7 @@ A **level** is a lowercase name such as `public` (`^[a-z][a-z0-9-]*$`), safe in 
 
 ## Status
 
-**working.** Protocol version 1.
+**stable.** Protocol version 1.
 
 Known gaps:
 

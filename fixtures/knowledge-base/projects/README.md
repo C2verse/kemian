@@ -7,10 +7,10 @@ visibility: public
 # Projects
 
 - [lantern.md](lantern.md): a language server for configuration files.
-- [tidepool.md](tidepool.md): an idea for a shared cache for build artifacts.
 
 <private>
 
 - [atlas.md](atlas.md): an unannounced side project.
+- [tidepool.md](tidepool.md): a draft idea for a shared cache for build artifacts.
 
 </private>

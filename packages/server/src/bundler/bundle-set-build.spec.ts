@@ -174,6 +174,53 @@ describe('links', () => {
     expect(result.problems.map((problem) => problem.message)).toEqual(['broken link: missing.md']);
   });
 
+  it('reports links to files the filter leaves out of the linking level', () => {
+    const result = buildFrom(
+      {
+        ...files,
+        'draft.md': '---\nvisibility: public\nstatus: draft\n---\nd',
+        'a.md': 'See [draft](draft.md).',
+      },
+      {
+        filter: ({ level, frontmatter }) => level !== 'public' || frontmatter['status'] !== 'draft',
+      },
+    );
+    expect(errorsOf(result).map((problem) => problem.message)).toEqual([
+      'public content links to draft.md, which the filter leaves out of public',
+    ]);
+    expect(pathsIn(result, 'public')).toEqual(['README.md']);
+    expect(pathsIn(result, 'private')).toEqual(['README.md', 'a.md', 'draft.md', 'secret.md']);
+  });
+
+  it('warns about links to excluded files', () => {
+    const result = buildFrom(
+      { ...files, 'raw/dump.md': `${publicReadme}dump`, 'a.md': '[d](raw/dump.md)' },
+      { exclude: ['raw/**'] },
+    );
+    expect(result.problems.map((problem) => problem.message)).toEqual([
+      'link points to raw/dump.md, which the config excludes',
+    ]);
+  });
+
+  it("blames a linked file's own errors rather than its level", () => {
+    const result = buildFrom({
+      ...files,
+      'broken-frontmatter.md': '---\nvisibility: [public\n---\nb',
+      'broken-markup.md': `${publicReadme}<private>unclosed`,
+      'a.md': '[f](broken-frontmatter.md) [m](broken-markup.md)',
+    });
+    const linkErrors = errorsOf(result).filter((problem) => problem.path === 'a.md');
+    expect(linkErrors.map((problem) => problem.message)).toEqual([
+      'public content links to broken-frontmatter.md, which is left out below private for its own errors; fix them first',
+      'public content links to broken-markup.md, which is left out below private for its own errors; fix them first',
+    ]);
+  });
+
+  it('warns about broken links in files only the highest level sees', () => {
+    const result = buildFrom({ ...files, 'secret.md': '---\nvisibility: private\n---\n[x](x.md)' });
+    expect(result.problems.map((problem) => problem.message)).toEqual(['broken link: x.md']);
+  });
+
   it('ignores links in code', () => {
     const result = buildFrom({ ...files, 'a.md': '`[s](secret.md)`\n\n```\n[s](secret.md)\n```' });
     expect(errorsOf(result)).toEqual([]);
@@ -216,6 +263,16 @@ describe('configuration', () => {
     );
     expect(pathsIn(result, 'public')).toEqual([]);
     expect(errorsOf(result)).toHaveLength(1);
+  });
+
+  it('leaves a file out when the filter returns anything but true', () => {
+    const untypedConfig = { levels: ['public', 'private'], filter: () => 'yes' };
+    const result = buildBundleSetFromTree({
+      tree: makeSourceTree({ 'a.md': `${publicReadme}a` }),
+      config: Effect.runSync(resolveConfig(untypedConfig)),
+      build,
+    });
+    expect(pathsIn(result, 'public')).toEqual([]);
   });
 
   it('copies kept frontmatter into meta and dates into updated', () => {

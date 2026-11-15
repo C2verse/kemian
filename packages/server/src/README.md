@@ -37,10 +37,10 @@ kemian.config.ts ─▶ loadConfig ─▶ resolveConfig ─▶ readSourceTree �
 ```
 
 1. [`loadConfig`](bundler/bundler.ts) imports the config file (Node strips its types), and [`resolveConfig`](bundler/config.ts) validates it and fills in defaults.
-2. [`readSourceTree`](bundler/source-tree.ts) reads every file under the root, skipping dot files and `node_modules`.
+2. [`readSourceTree`](bundler/source-tree.ts) reads every file under the root, skipping dot files, `node_modules`, and whatever `.gitignore` files under the root ignore.
 3. [`buildBundleSetFromTree`](bundler/bundle-set-build.ts) is the heart, in three passes over the included files:
    - **Analyze** each file: [`splitFrontmatter`](bundler/frontmatter.ts), then [`parseMarkup`](bundler/markup.ts) into a tree of lines, comments, spans, and blocks, then its level from [`VisibilityResolver`](bundler/visibility.ts) (own frontmatter, else the nearest folder `README.md`, else the default).
-   - **Check links**: render the file for each level below the highest and flag links to anything that level can't see.
+   - **Check links**: render the file for each level that gets it and flag links to anything outside that level's bundle: more restricted, filtered out, left out for errors, excluded, or missing.
    - **Build each level's bundle**: keep files the level may see (and, below the highest level, only error-free ones), run the `filter` hook, render with [`renderMarkup`](bundler/markup.ts), collect folders and instructions, and index the bundle's own files with [`buildSearchIndex`](search/search-index.ts).
 4. Problems carry a path, line, and severity. An error excludes the file below the highest level, and the CLI exits with 1.
 

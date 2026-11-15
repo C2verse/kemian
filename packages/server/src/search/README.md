@@ -18,7 +18,7 @@ It's exported so bundlers other than Kemian's can ship compatible indexes.
 
 ## Status
 
-**working.** MiniSearch 7, indexing `path`, `title`, `summary`, and `content`. Numbers like `110,000` stay one term and match only exactly; words of 4 letters or more also match by prefix and with a typo.
+**stable.** MiniSearch 7, indexing `path`, `title`, `summary`, and `content`. Numbers like `110,000` stay one term and match only exactly; words of 4 letters or more also match by prefix and with a typo.
 
 Known gaps:
 

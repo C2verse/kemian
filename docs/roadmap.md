@@ -12,22 +12,21 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 ## Milestones
 
-| Milestone                      | Status   | What's left                                                                  |
-| ------------------------------ | -------- | ---------------------------------------------------------------------------- |
-| M0: workspace                  | done     |                                                                              |
-| M1: public MVP on Cloudflare   | done     |                                                                              |
-| M2: private level              | deployed | Confirm a GitHub account not in `PRIVATE_IDENTITIES` is refused.             |
-| M3: first real deployment      | set up   | Deploy the author's Worker and add its publish token to the content repo.    |
-| M4: chat backend               | planned  | Everything: a chat module adding a `/chat` route.                            |
-| M5: template and Deploy button | planned  | Everything, then splitting modules into packages once their boundaries hold. |
+| Milestone                      | Status  | What's left                                                                  |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------- |
+| M0: workspace                  | done    |                                                                              |
+| M1: public MVP on Cloudflare   | done    |                                                                              |
+| M2: private level              | done    |                                                                              |
+| M3: first real deployment      | done    |                                                                              |
+| M4: chat backend               | planned | Everything: a chat module adding a `/chat` route.                            |
+| M5: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold. |
 
 ## Next Steps
 
 In order:
 
-1. Sign in to the demo's `?access=private` with a GitHub account not in `PRIVATE_IDENTITIES`, and confirm it's refused.
-2. Deploy the demo again and republish the fixture, so it runs the new search matching and its bundles carry an index in the current format.
-3. Deploy the author's Worker, which already has its config, CI publish step, and deploy steps in the content repo.
+1. Release the bundler's `.gitignore` support and stricter link checks, and drop the now redundant `dist/**` exclude from the author's config.
+2. M4: settle the chat's open questions below, then add the chat module.
 
 ## Open Questions
 
@@ -50,7 +49,6 @@ In order:
 - **Release is manual.** `nx release` needs `@nx/js`, which breaks the Nx project graph on TypeScript 7. Revisit when Nx supports TypeScript 7, or write custom version actions.
 - **Declarations aren't bundled.** tsdown's declaration bundling needs TypeScript 7.1's API; switch to its `tsgo` generator once 7.1 is stable.
 - **The demo's `wrangler.jsonc` holds the author's KV namespace ID.** Wrangler wrote it on the first deploy. Anyone else deploying the demo, or the template made from it, must remove it so Wrangler creates their own.
-- **Sign-in is only covered end to end.** `cloudflare/oauth.ts` runs only in `workerd`, so the demo's tests cover it, with no unit tests.
 
 ## Later
 

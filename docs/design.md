@@ -118,6 +118,7 @@ The full spec is [privacy-markup.md](privacy-markup.md). In short:
 - **Higher levels keep the tags** around content they may see, so agents at those levels know what is restricted. Configuration can turn this off.
 - **Below the highest level,** HTML comments are removed. Frontmatter is never part of `content`; only the summary, title, update date, and allowlisted keys reach a bundle.
 - **Fails closed:** a file with malformed markup, frontmatter, or visibility, an unclosed HTML comment or code fence, or a link to something its level can't see is left out of every bundle below the highest level, and `kemian check` reports it. `kemian publish` refuses to publish a build with errors, so the exclusion is a second layer.
+- **Links follow bundles, not just visibility:** a link to a file the `filter` hook leaves out of the linking level is an error, like a link up, because the filter withholds that file from the level and the link would still name it. A link to a file the configuration excludes is only a warning: it's dead at every level alike, and excluded folders are usually raw material, not secrets.
 
 The bundler started from the author's `export-public.mjs`: its line-based parser is kept, generalized to any number of levels, and its fail-open holes are fixed (tag case, HTML comments, frontmatter, unclosed fences, reference-style and HTML links).
 
@@ -137,7 +138,8 @@ export default defineConfig({
 ```
 
 - `searchIndex: false` leaves the prebuilt index out of bundles.
-- Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns something unexpected drops the file too.
+- Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns anything but `true` drops the file too.
+- `.gitignore` files inside the knowledge base are honored, so build output such as `dist/` needs no `exclude`. Parent folders' `.gitignore` files and Git's global excludes aren't read, so a build doesn't depend on where the folder sits or on the machine.
 - The CLI is `kemian check`, `kemian build` (to `dist/kemian/bundle-set.json`), and `kemian publish` (to a server's `/publish`, with the token from `KEMIAN_PUBLISH_TOKEN`); each exits with code 1 when there are errors.
 
 Worker (`apps/demo` is a complete example):

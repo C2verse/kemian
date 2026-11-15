@@ -16,4 +16,4 @@ GitHub only proves who the user is: no scopes are requested, and GitHub's token 
 
 ## Status
 
-**working.** Tested against a fake GitHub, and signed in against github.com from the deployed demo. Refusing a github.com account without a level is tested only against the fake.
+**stable.** Tested against a fake GitHub, and against github.com from the deployed demo, both signing in and refusing an account without a level.

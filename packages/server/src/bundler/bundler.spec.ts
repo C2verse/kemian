@@ -25,6 +25,7 @@ const privateFacts = [
   'December',
   'recruiter',
   'peer-to-peer cache',
+  'tidepool',
 ];
 const excludedFacts = ['meetup-talk-transcript', 'everyone thinks'];
 

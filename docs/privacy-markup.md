@@ -70,10 +70,11 @@ Values use double quotes. No other attributes are allowed.
 - **No nesting.**
 - **Code is literal.** Tags inside fenced code blocks and inline code aren't markup. To show a tag in prose, put it in inline code.
 - **Fail closed.** A file with an unclosed, nested, or malformed tag, an unclosed HTML comment, an unclosed code fence, malformed frontmatter, or an invalid level is left out of every bundle below the highest level, and `kemian check` reports it.
-- **No links up.** Content a level sees may link only to files and folders that level can see. A link to something more restricted goes inside markup for that level, e.g. an index entry for a private file goes inside `<private>`. Broken links are warnings.
+- **No links up.** Content a level sees may link only to files and folders that level can see. A link to something more restricted goes inside markup for that level, e.g. an index entry for a private file goes inside `<private>`. A file the `filter` hook leaves out of a level counts as more restricted for that level, and so does a file with errors below the highest level. Broken links and links to files the configuration excludes are warnings.
 - **When unsure, mark it restricted.**
 
 ## Tooling
 
 - `kemian check` validates the knowledge base without writing anything, and exits with code 1 if there are errors.
+- Files and folders that the knowledge base's `.gitignore` files ignore are never read, like dot files and `node_modules`.
 - `kemian build` writes the bundle set to `dist/kemian/bundle-set.json`, reports the same problems, and exits with code 1 if there are errors.

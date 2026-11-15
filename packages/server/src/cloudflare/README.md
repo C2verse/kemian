@@ -30,9 +30,8 @@ Hosts `core` on Cloudflare Workers: the Worker entry point and its routing, a `B
 
 ## Status
 
-**working.** Tested in local `workerd` through the demo; not yet deployed.
+**stable.** Tested in local `workerd` through the demo, and deployed on Cloudflare with the demo and the first real deployment.
 
 Known gaps:
 
 - Client ID Metadata Documents are off: they need the `global_fetch_strictly_public` flag, which would block the tests' local fake GitHub.
-- `oauth.ts` has no unit tests; the demo's end-to-end tests cover it.

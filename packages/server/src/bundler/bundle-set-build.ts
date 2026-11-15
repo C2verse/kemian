@@ -56,6 +56,9 @@ class BundleSetBuilder {
   readonly #buildInfo: BuildInfo;
   readonly #problems = new ProblemCollector();
   readonly #splits = new Map<string, FrontmatterSplit>();
+  readonly #filterResults = new Map<string, boolean>();
+  readonly #documents = new Map<string, SourceDocument>();
+  readonly #pathsWithOwnErrors = new Set<string>();
   readonly #visibility: VisibilityResolver;
   readonly #isIncluded: (path: string) => boolean;
 
@@ -83,6 +86,10 @@ class BundleSetBuilder {
       .filter(this.#isIncluded)
       .toSorted()
       .map((path) => this.#analyze(path));
+    for (const document of documents) {
+      this.#documents.set(document.path, document);
+      if (this.#problems.hasErrorsIn(document.path)) this.#pathsWithOwnErrors.add(document.path);
+    }
     for (const document of documents) this.#checkLinks(document);
 
     const [lowest, ...rest] = this.#config.levels;
@@ -150,8 +157,9 @@ class BundleSetBuilder {
 
   #checkLinks(document: SourceDocument): void {
     if (this.#problems.hasErrorsIn(document.path)) return;
-    for (const level of this.#levelsBelowHighest()) {
+    for (const level of this.#config.levels) {
       if (!this.#isVisible(document.visibility, level)) continue;
+      if (!this.#passesFilter(document, level)) continue;
       const content = this.#render(document.markup, level);
       for (const target of extractLinkTargets(content)) {
         this.#checkLink(document.path, target, level);
@@ -174,11 +182,38 @@ class BundleSetBuilder {
       this.#problems.add({ path, severity: 'warning', message: `broken link: ${target}` });
       return;
     }
-    if (this.#isVisible(targetVisibility, level)) return;
+    const highest = this.#highestLevel();
+    if (level !== highest && this.#pathsWithOwnErrors.has(resolved)) {
+      this.#problems.add({
+        path,
+        severity: 'error',
+        message: `${level} content links to ${resolved}, which is left out below ${highest} for its own errors; fix them first`,
+      });
+      return;
+    }
+    if (!this.#isVisible(targetVisibility, level)) {
+      this.#problems.add({
+        path,
+        severity: 'error',
+        message: `${level} content links to ${resolved}, which only ${targetVisibility} can see; wrap the link in <${targetVisibility}>`,
+      });
+      return;
+    }
+    if (!this.#tree.markdown.has(resolved)) return;
+    const targetDocument = this.#documents.get(resolved);
+    if (targetDocument === undefined) {
+      this.#problems.add({
+        path,
+        severity: 'warning',
+        message: `link points to ${resolved}, which the config excludes`,
+      });
+      return;
+    }
+    if (this.#passesFilter(targetDocument, level)) return;
     this.#problems.add({
       path,
       severity: 'error',
-      message: `${level} content links to ${resolved}, which only ${targetVisibility} can see; wrap the link in <${targetVisibility}>`,
+      message: `${level} content links to ${resolved}, which the filter leaves out of ${level}`,
     });
   }
 
@@ -201,12 +236,26 @@ class BundleSetBuilder {
   #isInBundle(document: SourceDocument, level: Level): boolean {
     if (!this.#isVisible(document.visibility, level)) return false;
     if (!this.#isHighest(level) && this.#problems.hasErrorsIn(document.path)) return false;
+    return this.#passesFilter(document, level);
+  }
+
+  #passesFilter(document: SourceDocument, level: Level): boolean {
+    const key = JSON.stringify([level, document.path]);
+    const cached = this.#filterResults.get(key);
+    if (cached !== undefined) return cached;
+    const passes = this.#runFilter(document, level);
+    this.#filterResults.set(key, passes);
+    return passes;
+  }
+
+  #runFilter(document: SourceDocument, level: Level): boolean {
     try {
-      return this.#config.filter({
+      const result: unknown = this.#config.filter({
         level,
         path: document.path,
         frontmatter: document.split.frontmatter,
       });
+      return result === true;
     } catch (error) {
       this.#problems.add({
         path: document.path,
@@ -347,8 +396,10 @@ class BundleSetBuilder {
     return split;
   }
 
-  #levelsBelowHighest(): readonly Level[] {
-    return this.#config.levels.slice(0, -1);
+  #highestLevel(): Level {
+    const highest = this.#config.levels.at(-1);
+    if (highest === undefined) throw new Error('unexpected config without levels');
+    return highest;
   }
 
   #isVisible(visibility: Level, level: Level): boolean {
