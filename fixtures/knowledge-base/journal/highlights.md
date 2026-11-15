@@ -2,6 +2,7 @@
 summary: Public highlights from Robin's journal.
 status: evolving
 updated: 2026-10-20
+verified: 2026-09-01
 visibility: public
 ---
 

@@ -15,18 +15,18 @@ flowchart LR
   github --> core
 ```
 
-| Module                               | Runs on       | In one sentence                                                                      |
-| ------------------------------------ | ------------- | ------------------------------------------------------------------------------------ |
-| [`protocol`](protocol/README.md)     | anywhere      | The bundle format: schemas, types, the version check, and the JSON Schema.           |
-| [`search`](search/README.md)         | anywhere      | The search index: built by the bundler, shipped in bundles, loaded by the server.    |
-| [`bundler`](bundler/README.md)       | Node          | Turns a folder of Markdown into one bundle per level, plus the `kemian` CLI.         |
-| [`core`](core/README.md)             | any Fetch API | The server: storage interface, publishing, access levels, search, and the MCP tools. |
-| [`cloudflare`](cloudflare/README.md) | Workers       | Wires `core` into a Worker: routing, R2 storage, and the OAuth server for sign-in.   |
-| [`github`](github/README.md)         | any Fetch API | Signs people in with GitHub and turns them into identities like `github:12345`.      |
+| Module                               | Runs on       | In one sentence                                                                    |
+| ------------------------------------ | ------------- | ---------------------------------------------------------------------------------- |
+| [`protocol`](protocol/README.md)     | anywhere      | The bundle format: schemas, types, the version check, and the JSON Schema.         |
+| [`search`](search/README.md)         | anywhere      | The search index: built by the bundler, shipped in bundles, loaded by the server.  |
+| [`bundler`](bundler/README.md)       | Node          | Turns a folder of Markdown into one bundle per level, plus the `kemian` CLI.       |
+| [`core`](core/README.md)             | any Fetch API | The server: storage interfaces, publishing, access levels, and the MCP tools.      |
+| [`cloudflare`](cloudflare/README.md) | Workers       | Wires `core` into a Worker: routing, R2 storage, and the OAuth server for sign-in. |
+| [`github`](github/README.md)         | any Fetch API | Signs people in with GitHub and turns them into identities like `github:12345`.    |
 
 Oxlint enforces the arrows: a module imports another only through its `index.ts`, and only in the directions above. `protocol`, `search`, `core`, and `github` can't import `node:*`, so they run in Workers.
 
-## The Four Flows
+## The Five Flows
 
 Everything the code does is one of these. Each step names the function to read.
 
@@ -78,6 +78,16 @@ client ─▶ /authorize (consent) ─▶ GitHub ─▶ /callback ─▶ complet
 
 [`oauth.ts`](cloudflare/oauth.ts) uses the Workers OAuth Provider's helpers. `showConsent` renders the consent page; `continueToSignIn` starts GitHub's flow with PKCE; `finishSignIn` exchanges the code through the [`SignInProvider`](core/sign-in.ts) (implemented by [`githubSignIn`](github/sign-in.ts)), refuses identities without a level, and completes the authorization with the identity as the token's props.
 
+### 5. Edit: Agent to Pull Request (`core` → `cloudflare` → `bundler`)
+
+```
+editing tool ─▶ ProposalStore (R2) ◀─GET /proposals─ kemian proposals pull ─▶ GitHub: branch, pull request, status
+```
+
+1. [`handleMcp`](core/kemian.ts) gives an editor at the highest level (the bundle says `highest`) the tools in [`editing-tools.ts`](core/editing-tools.ts). Each checks its input against the caller's bundle, e.g. that edits apply with [`applyTextEdits`](protocol/proposal.ts), and adds a [`Proposal`](protocol/proposal.ts) to the [`ProposalStore`](core/proposal-store.ts), within the daily limit.
+2. [`r2ProposalStore`](cloudflare/proposal-store.r2.ts) keeps each pending proposal as one object, plus a record per identity and day for the limit and retries. The Worker routes `/proposals` to [`handleProposals`](core/kemian.ts), which checks the proposals token.
+3. [`pullProposals`](bundler/proposal-pull.ts) fetches the queue and, for each proposal, [`applyProposal`](bundler/proposal-apply.ts) changes the source (or writes a note when it conflicts), [`reviewChanges`](bundler/proposal-review.ts) builds the bundle set before and after, and [`makeGitHubRepository`](bundler/github-repository.ts) commits, opens the pull request, and posts the `kemian/check` status. It acknowledges each proposal once it's handled.
+
 ## Conventions
 
 - **Effect inside, Promises outside.** Exported entry points that deployers call (`buildBundleSet`, `createKemian`, `kemian()`, `BundleStore`, `githubSignIn`) are plain TypeScript. Effect appears where failures branch: decoding, config, the CLI, and the request handlers in `core/kemian.ts`, which end in `Effect.runPromise`. Pure logic, like the markup parser and the bundle reader, is plain TypeScript.
@@ -87,8 +97,9 @@ client ─▶ /authorize (consent) ─▶ GitHub ─▶ /callback ─▶ complet
 
 ## Tests
 
-- **Next to the code** as `*.spec.ts`, run in Node: unit tests per file, plus `core/kemian.spec.ts`, which drives the server through the official MCP client.
-- **Shared bundles** in [`../test/bundles.ts`](../test/bundles.ts), outside any module so every module can use them.
+- **Next to the code** as `*.spec.ts`, run in Node: unit tests per file, plus `core/kemian.spec.ts` and `core/editing-tools.spec.ts`, which drive the server through the official MCP client.
+- **Shared test code** in [`../test/`](../test/), outside any module so every module can use it: bundles, the `ProposalStore` contract both stores pass, and a fake GitHub.
+- **Editing end to end** in [`../test/editing.spec.ts`](../test/editing.spec.ts): an editor proposes through the MCP tools, then the real CLI pulls the proposals over HTTP into pull requests on the fake GitHub.
 - **Packaging** in [`../test/package.spec.ts`](../test/package.spec.ts): builds, packs, and runs the packed package.
 - **End to end** in [`apps/demo/test/`](../../../apps/demo/test/): the Worker in local `workerd`, publishing the fixture with the real CLI, reading it over MCP, and signing in against a fake GitHub.
 - **Leak check**: `bundler/bundler.spec.ts` asserts that no private fact from the fixture appears in its public bundle, search index included.

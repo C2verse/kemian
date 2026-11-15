@@ -6,8 +6,29 @@ import { Command, Flag } from 'effect/cli';
 import packageJson from '../../package.json' with { type: 'json' };
 import { type BundleSet, decodeBundleSet } from '../protocol/index.ts';
 import { buildKnowledgeBase } from './bundler.ts';
+import { makeGitHubRepository } from './github-repository.ts';
 import { formatProblems, hasErrors, type Problem } from './problem.ts';
+import { formatPullReport, hasFailures, pullProposals } from './proposal-pull.ts';
+import { ProposalQueueError } from './proposal-queue.ts';
 import { PublishError, sendBundleSet } from './publish.ts';
+
+class GitHubSetupError extends Schema.TaggedError<
+  GitHubSetupError,
+  { readonly brand: unique symbol }
+>()('GitHubSetupError', { reason: Schema.String }) {
+  override get message(): string {
+    return `can't open pull requests: ${this.reason}`;
+  }
+}
+
+class ProposalsFailedError extends Schema.TaggedError<
+  ProposalsFailedError,
+  { readonly brand: unique symbol }
+>()('ProposalsFailedError', { numFailed: Schema.Int }) {
+  override get message(): string {
+    return `${this.numFailed} proposal(s) failed and stay queued for the next run`;
+  }
+}
 
 class ProblemsFoundError extends Schema.TaggedError<
   ProblemsFoundError,
@@ -136,9 +157,112 @@ const buildForPublishing = (config: string, source: Option.Option<string>) =>
     return bundleSet;
   });
 
+const pull = Command.make(
+  'pull',
+  {
+    config: configFlag,
+    url: Flag.String('url').pipe(
+      Flag.withDescription('URL of the Kemian server. Defaults to $KEMIAN_URL.'),
+      Flag.optional,
+    ),
+    repo: Flag.String('repo').pipe(
+      Flag.withDescription('GitHub repository as owner/name. Defaults to $GITHUB_REPOSITORY.'),
+      Flag.optional,
+    ),
+    base: Flag.String('base').pipe(
+      Flag.withDescription(
+        'Commit the checkout is at, which branches start from. Defaults to $GITHUB_SHA.',
+      ),
+      Flag.optional,
+    ),
+    dryRun: Flag.Boolean('dry-run').pipe(
+      Flag.withDescription('Shows what would happen without writing to GitHub or acknowledging.'),
+      Flag.withDefault(false),
+    ),
+  },
+  ({ config, url, repo, base, dryRun }) =>
+    Effect.gen(function* () {
+      const { serverUrl, proposalsToken } = yield* readQueueTarget(url);
+      const github = dryRun ? undefined : yield* readGitHubTarget({ repo, base });
+      const entries = yield* pullProposals({
+        configPath: config,
+        serverUrl,
+        proposalsToken,
+        ...(github === undefined ? {} : { github }),
+      });
+      const report = formatPullReport(entries);
+      yield* Console.error(dryRun ? `Dry run; nothing was written.\n${report}` : report);
+      yield* appendJobSummary(report);
+      if (hasFailures(entries)) {
+        return yield* new ProposalsFailedError({
+          numFailed: entries.filter((entry) => entry.outcome === 'failed').length,
+        });
+      }
+      return undefined;
+    }),
+).pipe(
+  Command.withDescription(
+    'Opens a pull request for each pending proposal from agents, and commits verified dates.',
+  ),
+);
+
+const readQueueTarget = (url: Option.Option<string>) => {
+  const serverUrl = Option.getOrUndefined(url) ?? process.env['KEMIAN_URL'];
+  const proposalsToken = process.env['KEMIAN_PROPOSALS_TOKEN'] ?? '';
+  if (serverUrl === undefined) {
+    return Effect.fail(new ProposalQueueError({ reason: 'pass --url or set KEMIAN_URL' }));
+  }
+  if (proposalsToken === '') {
+    return Effect.fail(new ProposalQueueError({ reason: 'set KEMIAN_PROPOSALS_TOKEN' }));
+  }
+  return Effect.succeed({ serverUrl, proposalsToken });
+};
+
+const readGitHubTarget = (options: {
+  readonly repo: Option.Option<string>;
+  readonly base: Option.Option<string>;
+}) => {
+  const repo = Option.getOrUndefined(options.repo) ?? process.env['GITHUB_REPOSITORY'];
+  const base = Option.getOrUndefined(options.base) ?? process.env['GITHUB_SHA'];
+  const token = process.env['GITHUB_TOKEN'] ?? '';
+  if (repo === undefined || !/^[\w.-]+\/[\w.-]+$/u.test(repo)) {
+    return Effect.fail(
+      new GitHubSetupError({ reason: 'pass --repo owner/name or set GITHUB_REPOSITORY' }),
+    );
+  }
+  if (base === undefined || base === '') {
+    return Effect.fail(new GitHubSetupError({ reason: 'pass --base <commit> or set GITHUB_SHA' }));
+  }
+  if (token === '') return Effect.fail(new GitHubSetupError({ reason: 'set GITHUB_TOKEN' }));
+  const apiUrl = process.env['GITHUB_API_URL'];
+  return Effect.succeed({
+    base,
+    repository: makeGitHubRepository({
+      repo,
+      token,
+      ...(apiUrl === undefined || apiUrl === '' ? {} : { apiUrl }),
+    }),
+  });
+};
+
+const appendJobSummary = (report: string) =>
+  Effect.gen(function* () {
+    const summaryPath = process.env['GITHUB_STEP_SUMMARY'];
+    if (summaryPath === undefined || summaryPath === '') return;
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.writeFileString(summaryPath, `## Kemian Proposals\n\n${report}\n`, {
+      flag: 'a',
+    });
+  });
+
+const proposals = Command.make('proposals').pipe(
+  Command.withDescription('Handles changes agents proposed through the editing tools.'),
+  Command.withSubcommands([pull]),
+);
+
 const kemian = Command.make('kemian').pipe(
   Command.withDescription('Serves one Markdown knowledge base to different audiences over MCP.'),
-  Command.withSubcommands([check, build, publish]),
+  Command.withSubcommands([check, build, publish, proposals]),
 );
 
 const exitWithFailure = (message?: string) =>
@@ -156,6 +280,12 @@ Command.run(kemian, { version: packageJson.version }).pipe(
     InvalidBundleError: (error) => exitWithFailure(error.message),
     UnsupportedProtocolError: (error) => exitWithFailure(error.message),
     PlatformError: (error) => exitWithFailure(error.message),
+    ProposalQueueError: (error) => exitWithFailure(error.message),
+    InvalidProposalError: (error) => exitWithFailure(error.message),
+    GitHubError: (error) => exitWithFailure(error.message),
+    GitHubSetupError: (error) => exitWithFailure(error.message),
+    ProposalsFailedError: (error) => exitWithFailure(error.message),
+    RepositoryNotFoundError: (error) => exitWithFailure(error.message),
   }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

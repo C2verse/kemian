@@ -30,6 +30,7 @@ export const publicBundle = (buildId = 'build-1'): Bundle => ({
 export const privateBundle = (buildId = 'build-1'): Bundle => ({
   protocol: 1,
   level: 'private',
+  highest: true,
   build: buildOf(buildId),
   folders: [{ path: '' }, { path: 'projects', summary: 'Things Robin has built.' }],
   files: [

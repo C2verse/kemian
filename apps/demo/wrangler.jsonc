@@ -9,9 +9,10 @@
     "GITHUB_BASE_URL": "https://github.com",
     "GITHUB_API_BASE_URL": "https://api.github.com",
     "PRIVATE_IDENTITIES": "github:63489409",
+    "EDITOR_IDENTITIES": "github:63489409",
   },
   "secrets": {
-    "required": ["KEMIAN_PUBLISH_TOKEN", "GITHUB_CLIENT_SECRET"],
+    "required": ["KEMIAN_PUBLISH_TOKEN", "KEMIAN_PROPOSALS_TOKEN", "GITHUB_CLIENT_SECRET"],
   },
   "r2_buckets": [
     {

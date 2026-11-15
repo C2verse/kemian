@@ -2,20 +2,8 @@ import { Effect, Exit } from 'effect';
 
 import type { BundleStore } from '../core/index.ts';
 import { decodeBundle } from '../protocol/index.ts';
-
-/**
- * Subset of a Cloudflare R2 bucket binding that the bundle store uses.
- */
-export interface R2BucketLike {
-  get(key: string): Promise<{ text(): Promise<string> } | null>;
-  put(key: string, value: string): Promise<unknown>;
-  list(options: { readonly prefix: string; readonly cursor?: string }): Promise<{
-    readonly objects: readonly { readonly key: string }[];
-    readonly truncated: boolean;
-    readonly cursor?: string;
-  }>;
-  delete(keys: string | string[]): Promise<void>;
-}
+import type { R2BucketLike } from './r2-bucket.ts';
+import { listKeys } from './r2-key-listing.ts';
 
 /**
  * Creates a {@link BundleStore} on an R2 bucket.
@@ -78,17 +66,6 @@ export const r2BundleStore = (
       if (stale.length > 0) await bucket.delete(stale);
     },
   };
-};
-
-const listKeys = async (bucket: R2BucketLike, prefix: string): Promise<string[]> => {
-  const keys: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await bucket.list(cursor === undefined ? { prefix } : { prefix, cursor });
-    keys.push(...page.objects.map((object) => object.key));
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor !== undefined);
-  return keys;
 };
 
 const readString = (value: unknown, key: string): string | undefined => {

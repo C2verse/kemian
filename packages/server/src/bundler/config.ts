@@ -34,6 +34,10 @@ export interface KemianConfig {
     readonly title?: string;
     /** Defaults to `updated`. */
     readonly updated?: string;
+    /** Frontmatter key of the date a file was last confirmed true. Defaults to `verified`. */
+    readonly verified?: string;
+    /** Frontmatter key of a file's status, e.g. `stable`. Defaults to `status`. */
+    readonly status?: string;
     /** Frontmatter keys copied into each file's `meta`. */
     readonly keep?: readonly string[];
   };
@@ -47,6 +51,22 @@ export interface KemianConfig {
   readonly filter?: (file: BundleFileCandidate) => boolean;
   /** Returns the URL where people can read a file, if any. */
   readonly url?: (file: { readonly level: string; readonly path: string }) => string | undefined;
+  readonly review?: {
+    /**
+     * Days after its verified (else updated) date that a file of each status is due for review, e.g.
+     * `{ evolving: 30, stable: 180 }`. Files of other statuses are never due.
+     */
+    readonly intervals: Readonly<Record<string, number>>;
+  };
+  /** How `kemian proposals pull` applies proposals from agents. */
+  readonly proposals?: {
+    /** Folder new notes go in, relative to the root. Defaults to `inbox`. */
+    readonly notes?: string;
+    /** Status an obsolete file gets when it's archived. Defaults to `archived`. */
+    readonly archivedStatus?: string;
+    /** Whether an obsolete note is deleted or archived like other files. Defaults to `delete`. */
+    readonly obsoleteNotes?: 'delete' | 'archive';
+  };
 }
 
 /**
@@ -63,6 +83,8 @@ export interface ResolvedConfig {
     readonly summary: string;
     readonly title: string;
     readonly updated: string;
+    readonly verified: string;
+    readonly status: string;
   };
   readonly keep: readonly string[];
   readonly markers: 'keep' | 'strip';
@@ -70,6 +92,12 @@ export interface ResolvedConfig {
   readonly instructions: ReadonlyMap<Level, string>;
   readonly filter: (file: BundleFileCandidate) => boolean;
   readonly url: (file: { readonly level: string; readonly path: string }) => string | undefined;
+  readonly reviewIntervals: ReadonlyMap<string, number>;
+  readonly proposals: {
+    readonly notesFolder: string;
+    readonly archivedStatus: string;
+    readonly obsoleteNotes: 'delete' | 'archive';
+  };
 }
 
 /**
@@ -89,6 +117,10 @@ export class InvalidConfigError extends Schema.TaggedError<
  */
 export const defineConfig = (config: KemianConfig): KemianConfig => config;
 
+const isRelativeFolderPath = (path: string): boolean =>
+  !path.includes('\\') &&
+  path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+
 const ConfigData = Schema.Struct({
   levels: Schema.NonEmptyArray(Level),
   root: Schema.optionalKey(Schema.String),
@@ -101,12 +133,35 @@ const ConfigData = Schema.Struct({
       summary: Schema.optionalKey(Schema.NonEmptyString),
       title: Schema.optionalKey(Schema.NonEmptyString),
       updated: Schema.optionalKey(Schema.NonEmptyString),
+      verified: Schema.optionalKey(Schema.NonEmptyString),
+      status: Schema.optionalKey(Schema.NonEmptyString),
       keep: Schema.optionalKey(Schema.Array(Schema.String)),
     }),
   ),
   markers: Schema.optionalKey(Schema.Literals(['keep', 'strip'])),
   searchIndex: Schema.optionalKey(Schema.Boolean),
   instructions: Schema.optionalKey(Schema.Record(Level, Schema.NonEmptyString)),
+  review: Schema.optionalKey(
+    Schema.Struct({
+      intervals: Schema.Record(
+        Schema.String,
+        Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 36_500 })),
+      ),
+    }),
+  ),
+  proposals: Schema.optionalKey(
+    Schema.Struct({
+      notes: Schema.optionalKey(
+        Schema.String.check(
+          Schema.makeFilter(isRelativeFolderPath, {
+            expected: 'a relative folder path without empty, . or .. segments',
+          }),
+        ),
+      ),
+      archivedStatus: Schema.optionalKey(Schema.NonEmptyString),
+      obsoleteNotes: Schema.optionalKey(Schema.Literals(['delete', 'archive'])),
+    }),
+  ),
 });
 const formatIssue = SchemaIssue.makeFormatterDefault();
 
@@ -145,6 +200,8 @@ export const resolveConfig = (config: unknown): Effect.Effect<ResolvedConfig, In
         summary: data.frontmatter?.summary ?? 'summary',
         title: data.frontmatter?.title ?? 'title',
         updated: data.frontmatter?.updated ?? 'updated',
+        verified: data.frontmatter?.verified ?? 'verified',
+        status: data.frontmatter?.status ?? 'status',
       },
       keep: data.frontmatter?.keep ?? [],
       markers: data.markers ?? 'keep',
@@ -152,6 +209,12 @@ export const resolveConfig = (config: unknown): Effect.Effect<ResolvedConfig, In
       instructions: new Map(Object.entries(data.instructions ?? {})),
       filter,
       url,
+      reviewIntervals: new Map(Object.entries(data.review?.intervals ?? {})),
+      proposals: {
+        notesFolder: data.proposals?.notes ?? 'inbox',
+        archivedStatus: data.proposals?.archivedStatus ?? 'archived',
+        obsoleteNotes: data.proposals?.obsoleteNotes ?? 'delete',
+      },
     };
   });
 

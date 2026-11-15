@@ -225,6 +225,7 @@ class BundleSetBuilder {
     return {
       protocol: 1,
       level,
+      ...(this.#isHighest(level) ? { highest: true } : {}),
       build: this.#buildInfo,
       ...(instructions === undefined ? {} : { instructions }),
       ...(this.#config.searchIndex ? { search: buildSearchIndex(files) } : {}),
@@ -272,7 +273,11 @@ class BundleSetBuilder {
     const content = trimBlankLines(hasErrors ? split.body : this.#render(document.markup, level));
     const title = hasErrors ? undefined : this.#renderInline(document.title, level);
     const summary = hasErrors ? undefined : this.#renderInline(document.summary, level);
-    const updated = this.#updatedOf(path, split.frontmatter);
+    const updated = this.#dateOf(path, split.frontmatter, this.#config.frontmatterKeys.updated);
+    const verified = this.#dateOf(path, split.frontmatter, this.#config.frontmatterKeys.verified);
+    const reviewDue = this.#isHighest(level)
+      ? this.#reviewDueOf(split.frontmatter, verified ?? updated)
+      : undefined;
     const url = this.#urlOf(path, level);
     const meta = this.#metaOf(path, split.frontmatter);
     const heading = title ?? extractHeading1(content);
@@ -282,6 +287,8 @@ class BundleSetBuilder {
       ...(heading === undefined ? {} : { title: heading }),
       ...(summary === undefined ? {} : { summary }),
       ...(updated === undefined ? {} : { updated }),
+      ...(verified === undefined ? {} : { verified }),
+      ...(reviewDue === undefined ? {} : { reviewDue }),
       ...(url === undefined ? {} : { url }),
       ...(meta === undefined ? {} : { meta }),
       content,
@@ -328,8 +335,11 @@ class BundleSetBuilder {
     return instructions === '' ? undefined : instructions;
   }
 
-  #updatedOf(path: string, frontmatter: Readonly<Record<string, unknown>>): string | undefined {
-    const key = this.#config.frontmatterKeys.updated;
+  #dateOf(
+    path: string,
+    frontmatter: Readonly<Record<string, unknown>>,
+    key: string,
+  ): string | undefined {
     const value = frontmatter[key];
     if (value === undefined) return undefined;
     if (typeof value === 'string' && DATE.test(value)) return value;
@@ -342,6 +352,19 @@ class BundleSetBuilder {
       message: `${key} must be a YYYY-MM-DD date`,
     });
     return undefined;
+  }
+
+  #reviewDueOf(
+    frontmatter: Readonly<Record<string, unknown>>,
+    lastChecked: string | undefined,
+  ): string | undefined {
+    const status = frontmatter[this.#config.frontmatterKeys.status];
+    if (typeof status !== 'string') return undefined;
+    const interval = this.#config.reviewIntervals.get(status);
+    if (interval === undefined) return undefined;
+    return lastChecked === undefined
+      ? this.#buildInfo.createdAt.slice(0, 10)
+      : addDaysTo(lastChecked, interval);
   }
 
   #urlOf(path: string, level: Level): string | undefined {
@@ -447,6 +470,11 @@ const makePathMatcher = (config: ResolvedConfig): ((path: string) => boolean) =>
     }
     return !isExcluded;
   };
+};
+
+const addDaysTo = (date: string, days: number): string => {
+  const [year = 0, month = 1, day = 1] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 };
 
 const trimBlankLines = (text: string): string => text.replace(/^(?:[ \t]*\n)+/u, '').trimEnd();

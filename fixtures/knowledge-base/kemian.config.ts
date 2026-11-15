@@ -7,4 +7,5 @@ export default {
   filter: ({ level, frontmatter }) => level !== 'public' || frontmatter['status'] !== 'draft',
   instructions: { public: 'meta/public-instructions.md' },
   url: ({ path }) => `https://github.com/example/knowledge-base/blob/main/${path}`,
+  review: { intervals: { evolving: 30, stable: 180 } },
 } satisfies KemianConfig;

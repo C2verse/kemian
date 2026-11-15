@@ -287,6 +287,54 @@ describe('configuration', () => {
     expect(fileIn(result, 'private', 'a.md')?.meta).not.toHaveProperty('secret');
   });
 
+  it('copies the verified date into every level', () => {
+    const result = buildFrom({
+      'README.md': publicReadme,
+      'a.md': '---\nverified: 2026-11-01\n---\na',
+      'b.md': '---\nverified: soon\n---\nb',
+    });
+    expect(fileIn(result, 'public', 'a.md')?.verified).toBe('2026-11-01');
+    expect(fileIn(result, 'private', 'a.md')?.verified).toBe('2026-11-01');
+    expect(fileIn(result, 'private', 'b.md')).not.toHaveProperty('verified');
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({ path: 'b.md', message: 'verified must be a YYYY-MM-DD date' }),
+    );
+  });
+
+  it('dates reviews from the verified date, else the updated date, only in the highest bundle', () => {
+    const result = buildFrom(
+      {
+        'README.md': publicReadme,
+        'verified.md': '---\nstatus: evolving\nupdated: 2026-01-01\nverified: 2026-10-20\n---\na',
+        'updated.md': '---\nstatus: stable\nupdated: 2026-10-18\n---\na',
+        'undated.md': '---\nstatus: evolving\n---\na',
+        'draft.md': '---\nstatus: draft\nupdated: 2026-10-18\n---\na',
+        'plain.md': 'a',
+      },
+      { review: { intervals: { evolving: 30, stable: 180 } } },
+    );
+    expect(fileIn(result, 'private', 'verified.md')?.reviewDue).toBe('2026-11-19');
+    expect(fileIn(result, 'private', 'updated.md')?.reviewDue).toBe('2027-04-16');
+    expect(fileIn(result, 'private', 'undated.md')?.reviewDue).toBe('2026-10-25');
+    expect(fileIn(result, 'private', 'draft.md')).not.toHaveProperty('reviewDue');
+    expect(fileIn(result, 'private', 'plain.md')).not.toHaveProperty('reviewDue');
+    expect(bundleOf(result, 'public').files.some((file) => 'reviewDue' in file)).toBe(false);
+  });
+
+  it('reads custom verified and status keys', () => {
+    const result = buildFrom(
+      { 'a.md': '---\nstate: open\nchecked: 2026-10-01\n---\na' },
+      {
+        frontmatter: { verified: 'checked', status: 'state' },
+        review: { intervals: { open: 1 } },
+      },
+    );
+    expect(fileIn(result, 'private', 'a.md')).toMatchObject({
+      verified: '2026-10-01',
+      reviewDue: '2026-10-02',
+    });
+  });
+
   it('reads custom frontmatter keys', () => {
     const result = buildFrom(
       { 'a.md': '---\naccess: public\ndescription: A file\n---\na' },
@@ -369,4 +417,10 @@ describe('output', () => {
       expect(decoded.bundles.map((bundle) => bundle.level)).toEqual(['public', 'private']);
     }),
   );
+
+  it('marks only the highest bundle as highest', () => {
+    const result = buildFrom({ 'a.md': 'a' });
+    expect(bundleOf(result, 'private').highest).toBe(true);
+    expect(bundleOf(result, 'public')).not.toHaveProperty('highest');
+  });
 });

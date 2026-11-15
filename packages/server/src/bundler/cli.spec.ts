@@ -9,9 +9,13 @@ import { describe, expect, it } from '@effect/vitest';
 const cli = fileURLToPath(new URL('cli.ts', import.meta.url));
 const fixture = fileURLToPath(new URL('../../../../fixtures/knowledge-base/', import.meta.url));
 
-const runCli = (args: readonly string[], cwd: string) =>
+const runCli = (
+  args: readonly string[],
+  cwd: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) =>
   new Promise<{ readonly code: number; readonly output: string }>((resolve) => {
-    execFile('node', [cli, ...args], { cwd }, (error, stdout, stderr) => {
+    execFile('node', [cli, ...args], { cwd, env }, (error, stdout, stderr) => {
       const code = typeof error?.code === 'number' ? error.code : error === null ? 0 : -1;
       resolve({ code, output: stdout + stderr });
     });
@@ -60,5 +64,45 @@ describe('kemian build', () => {
     const bundleSet = JSON.parse(await readFile(join(root, 'dist/kemian/bundle-set.json'), 'utf8'));
     expect(bundleSet.build.source).toBe('abc123');
     expect(bundleSet.bundles[0].files[0].content).toBe('Hello');
+  });
+});
+
+describe('kemian proposals pull', () => {
+  const {
+    GITHUB_TOKEN: _token,
+    GITHUB_REPOSITORY: _repository,
+    GITHUB_SHA: _sha,
+    ...cleanEnv
+  } = process.env;
+  const env = {
+    ...cleanEnv,
+    KEMIAN_URL: 'http://127.0.0.1:9',
+    KEMIAN_PROPOSALS_TOKEN: 'token',
+  };
+
+  it.each([
+    ['no server URL', { KEMIAN_URL: undefined }, [], 'pass --url or set KEMIAN_URL'],
+    ['no proposals token', { KEMIAN_PROPOSALS_TOKEN: '' }, [], 'set KEMIAN_PROPOSALS_TOKEN'],
+    ['no repository', {}, [], 'pass --repo owner/name or set GITHUB_REPOSITORY'],
+    ['no base commit', {}, ['--repo', 'robin/kb'], 'pass --base <commit> or set GITHUB_SHA'],
+    [
+      'no GitHub token',
+      {},
+      ['--repo', 'robin/kb', '--base', 'abc'],
+      "can't open pull requests: set GITHUB_TOKEN",
+    ],
+  ])('fails with %s', async (_, overrides, args, message) => {
+    const { code, output } = await runCli(['proposals', 'pull', ...args], fixture, {
+      ...env,
+      ...overrides,
+    });
+    expect(output).toContain(message);
+    expect(code).toBe(1);
+  });
+
+  it('fails when the server is unreachable, even in a dry run', async () => {
+    const { code, output } = await runCli(['proposals', 'pull', '--dry-run'], fixture, env);
+    expect(output).toContain("reading proposals failed: can't reach http://127.0.0.1:9/proposals");
+    expect(code).toBe(1);
   });
 });

@@ -3,7 +3,7 @@
 ## Layout
 
 - `src/`: the modules, described in its `README.md`.
-- `test/`: bundles shared by several modules' tests, and the packaging test.
+- `test/`: code shared by several modules' tests (bundles, the `ProposalStore` contract, a fake GitHub, and an HTTP wrapper for handlers), the editing end-to-end test, and the packaging test.
 - `schema/`: the protocol's generated JSON Schema, checked in and shipped.
 - `tsdown.config.ts` and `tsconfig.build.json`: the package build.
 

@@ -18,11 +18,34 @@ describe('resolveConfig', () => {
           summary: 'summary',
           title: 'title',
           updated: 'updated',
+          verified: 'verified',
+          status: 'status',
         },
         markers: 'keep',
+        proposals: { notesFolder: 'inbox', archivedStatus: 'archived', obsoleteNotes: 'delete' },
       });
+      expect(config.reviewIntervals.size).toBe(0);
       expect(config.filter({ level: 'public', path: 'a.md', frontmatter: {} })).toBe(true);
       expect(config.url({ level: 'public', path: 'a.md' })).toBeUndefined();
+    }),
+  );
+
+  it.effect('reads review intervals and proposal options', () =>
+    Effect.gen(function* () {
+      const config = yield* resolveConfig({
+        levels: ['public'],
+        review: { intervals: { evolving: 30, stable: 180 } },
+        proposals: { notes: 'notes/agents', archivedStatus: 'retired', obsoleteNotes: 'archive' },
+      });
+      expect([...config.reviewIntervals]).toEqual([
+        ['evolving', 30],
+        ['stable', 180],
+      ]);
+      expect(config.proposals).toEqual({
+        notesFolder: 'notes/agents',
+        archivedStatus: 'retired',
+        obsoleteNotes: 'archive',
+      });
     }),
   );
 
@@ -45,6 +68,18 @@ describe('resolveConfig', () => {
     ['an unknown markers option', { levels: ['public'], markers: 'hide' }],
     ['a filter that is not a function', { levels: ['public'], filter: 'drafts' }],
     ['a missing config', undefined],
+    ['a review interval of zero days', { levels: ['public'], review: { intervals: { a: 0 } } }],
+    ['a fractional review interval', { levels: ['public'], review: { intervals: { a: 1.5 } } }],
+    ['a notes folder outside the root', { levels: ['public'], proposals: { notes: '../inbox' } }],
+    ['an absolute notes folder', { levels: ['public'], proposals: { notes: '/inbox' } }],
+    [
+      'a notes folder with a trailing slash',
+      { levels: ['public'], proposals: { notes: 'inbox/' } },
+    ],
+    [
+      'an unknown obsolete notes option',
+      { levels: ['public'], proposals: { obsoleteNotes: 'keep' } },
+    ],
   ])('rejects %s', (_, config) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(resolveConfig(config));

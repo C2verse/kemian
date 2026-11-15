@@ -2,6 +2,7 @@ import packageJson from '../../package.json' with { type: 'json' };
 import {
   type BundleStore,
   createKemian,
+  type EditingOptions,
   type ExtendHook,
   type Identity,
   type Kemian,
@@ -34,6 +35,11 @@ export interface KemianWorkerOptions<Env> {
   readonly name?: string;
   /** Adds deployment-specific tools for each request. */
   readonly extend?: ExtendHook;
+  /**
+   * Lets editors propose changes, e.g. with `proposals: r2ProposalStore(env.BUNDLES)`. Read-only for everyone without
+   * it.
+   */
+  readonly editing?: EditingOptions;
   /** Serves requests that aren't for MCP, sign-in, or publishing. Defaults to 404. */
   readonly fallback?: (
     request: Request,
@@ -51,6 +57,7 @@ export interface KemianWorker<Env> {
 
 const MCP_PATH = '/mcp';
 const PUBLISH_PATH = '/publish';
+const PROPOSALS_PATHS: ReadonlySet<string> = new Set(['/proposals', '/proposals/acknowledge']);
 const CORS_HEADERS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
@@ -104,6 +111,9 @@ export const kemian = <Env extends object>(
           : options.fallback(fallbackRequest, fallbackEnv, fallbackContext);
 
       if (url.pathname === PUBLISH_PATH) return server.handlePublish(request);
+      if (options.editing !== undefined && PROPOSALS_PATHS.has(url.pathname)) {
+        return server.handleProposals(request);
+      }
       if (url.pathname === MCP_PATH && !isSignInRequested(request, url, options)) {
         return serveMcp(server, request, undefined);
       }

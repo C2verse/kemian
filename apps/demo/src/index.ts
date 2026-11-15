@@ -1,4 +1,4 @@
-import { kemian, r2BundleStore } from '@kemian/server/cloudflare';
+import { kemian, r2BundleStore, r2ProposalStore } from '@kemian/server/cloudflare';
 import { githubSignIn } from '@kemian/server/github';
 
 const listOf = (value: string): string[] =>
@@ -12,6 +12,11 @@ export default kemian((env: Env) => ({
   anonymous: 'public',
   levels: { private: listOf(env.PRIVATE_IDENTITIES) },
   publishToken: env.KEMIAN_PUBLISH_TOKEN,
+  editing: {
+    proposals: r2ProposalStore(env.BUNDLES),
+    editors: listOf(env.EDITOR_IDENTITIES),
+    proposalsToken: env.KEMIAN_PROPOSALS_TOKEN,
+  },
   ...(env.GITHUB_CLIENT_ID === '' || !env.GITHUB_CLIENT_SECRET
     ? {}
     : {

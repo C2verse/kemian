@@ -8,3 +8,5 @@
 - **Name each reusable schema** with `.annotate({ identifier })`, so the JSON Schema has named `$defs`.
 - **Regenerate the checked-in JSON Schema** with `pnpm exec vitest run -u src/protocol` in `packages/server`, only for an intended change, and review the diff; `json-schema.spec.ts` fails on any unintended one.
 - Decoders drop unknown fields, so a newer writer's extra fields never reach code that doesn't know them.
+- **Proposals follow the same rules.** The server writes them and the CLI reads them, possibly at different versions of Kemian, so a new kind or verdict is a protocol change, not an optional field.
+- **`applyTextEdits` defines what an edit means** for both the server, which checks edits against the bundle, and the CLI, which applies them to the source; change it only for both at once.

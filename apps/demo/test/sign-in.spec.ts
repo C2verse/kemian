@@ -11,6 +11,7 @@ const demo = fileURLToPath(new URL('..', import.meta.url));
 const fixture = fileURLToPath(new URL('../../../fixtures/knowledge-base/', import.meta.url));
 const cli = fileURLToPath(new URL('../../../packages/server/src/bundler/cli.ts', import.meta.url));
 const publishToken = 'sign-in-publish-token';
+const proposalsToken = 'sign-in-proposals-token';
 const clientRedirect = 'http://127.0.0.1:9/callback';
 
 const base64Url = (bytes: Buffer): string => bytes.toString('base64url');
@@ -177,12 +178,40 @@ const connect = async (accessToken?: string) => {
   return client;
 };
 
-const readText = async (client: Client, path: string) => {
-  const result = await client.callTool({ name: 'read', arguments: { paths: [path] } });
+const callTool = async (client: Client, name: string, args: Record<string, unknown>) => {
+  const result = await client.callTool({ name, arguments: args });
   return result.content
     .map((part) => (typeof part === 'object' && part !== null ? Reflect.get(part, 'text') : ''))
     .join('');
 };
+
+const readText = (client: Client, path: string) => callTool(client, 'read', { paths: [path] });
+
+const signInRobin = async () => {
+  const { location, clientId, verifier } = await authorize({ github: { code: 'robin-code' } });
+  return exchangeCode({ code: location.searchParams.get('code') ?? '', clientId, verifier });
+};
+
+const fetchProposals = async (options: { readonly token?: string } = {}) =>
+  fetch(new URL('proposals', baseUrl), {
+    headers: { authorization: `Bearer ${options.token ?? proposalsToken}` },
+  });
+
+const runCli = (args: readonly string[]) =>
+  new Promise<{ readonly code: number; readonly output: string }>((resolve) => {
+    execFile(
+      'node',
+      [cli, ...args],
+      {
+        cwd: fixture,
+        env: { ...process.env, KEMIAN_URL: baseUrl.href, KEMIAN_PROPOSALS_TOKEN: proposalsToken },
+      },
+      (error, stdout, stderr) => {
+        const code = typeof error?.code === 'number' ? error.code : error === null ? 0 : -1;
+        resolve({ code, output: stdout + stderr });
+      },
+    );
+  });
 
 beforeAll(async () => {
   await new Promise<void>((resolve) => github.server.listen(0, '127.0.0.1', resolve));
@@ -199,8 +228,13 @@ beforeAll(async () => {
           GITHUB_BASE_URL: githubUrl,
           GITHUB_API_BASE_URL: githubUrl,
           PRIVATE_IDENTITIES: 'github:12345',
+          EDITOR_IDENTITIES: 'github:12345',
         },
-        secrets: { KEMIAN_PUBLISH_TOKEN: publishToken, GITHUB_CLIENT_SECRET: 'client-secret' },
+        secrets: {
+          KEMIAN_PUBLISH_TOKEN: publishToken,
+          KEMIAN_PROPOSALS_TOKEN: proposalsToken,
+          GITHUB_CLIENT_SECRET: 'client-secret',
+        },
       },
     ],
   });
@@ -298,5 +332,90 @@ describe('sign-in', () => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
     });
     expect(response.status).toBe(401);
+  });
+});
+
+describe('editing', () => {
+  it('gives a signed-in editor the editing tools', async () => {
+    const client = await connect(await signInRobin());
+    const tools = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(tools).toEqual(
+      expect.arrayContaining(['note', 'propose_edit', 'list_stale', 'resolve_stale']),
+    );
+    expect(client.getInstructions()).toContain('You may also propose changes.');
+    await client.close();
+  });
+
+  it('keeps anonymous callers read-only', async () => {
+    const client = await connect();
+    expect((await client.listTools()).tools.map((tool) => tool.name).toSorted()).toEqual([
+      'list',
+      'read',
+      'search',
+    ]);
+    await client.close();
+  });
+
+  it('queues proposals in R2 and lists files due for review', async () => {
+    const client = await connect(await signInRobin());
+    const stale = await callTool(client, 'list_stale', {});
+    expect(stale).toContain(
+      '1. journal/highlights.md — Highlights\n   verified 2026-09-01; due 2026-10-01',
+    );
+    const build = /Build: (\S+)/u.exec(stale)?.[1] ?? '';
+    expect(
+      await callTool(client, 'note', { title: 'Lantern supports TOML', body: 'Robin said so.' }),
+    ).toContain('Proposed the note "Lantern supports TOML"');
+    expect(
+      await callTool(client, 'resolve_stale', {
+        path: 'journal/highlights.md',
+        build,
+        verdict: 'current',
+      }),
+    ).toContain('Recorded journal/highlights.md as current');
+    expect(await callTool(client, 'list_stale', {})).not.toContain('journal/highlights.md');
+    await client.close();
+  });
+
+  it('serves proposals to the proposals token only, without sign-in', async () => {
+    expect((await fetchProposals({ token: 'wrong' })).status).toBe(401);
+    const response = await fetchProposals();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      protocol: 1,
+      proposals: [
+        { kind: 'note', title: 'Lantern supports TOML', author: { identity: 'github:12345' } },
+        { kind: 'stale', verdict: 'current', path: 'journal/highlights.md' },
+      ],
+    });
+  });
+
+  it('plans pull requests with a dry run of kemian proposals pull', async () => {
+    const { code, output } = await runCli(['proposals', 'pull', '--dry-run']);
+    expect(output).toContain('Dry run; nothing was written.');
+    expect(output).toContain('- **planned** ✅: Note: Lantern supports TOML');
+    expect(output).toContain(
+      '- **planned** ✅: Mark 1 file(s) verified: Verified journal/highlights.md.',
+    );
+    expect(code).toBe(0);
+    const body: unknown = await (await fetchProposals()).json();
+    expect(body).toMatchObject({ proposals: [{}, {}] });
+  });
+
+  it('drops acknowledged proposals', async () => {
+    const proposals: unknown = Reflect.get(
+      Object(await (await fetchProposals()).json()),
+      'proposals',
+    );
+    const ids = (Array.isArray(proposals) ? proposals : []).map((proposal) =>
+      readString(proposal, 'id'),
+    );
+    const response = await fetch(new URL('proposals/acknowledge', baseUrl), {
+      method: 'POST',
+      headers: { 'authorization': `Bearer ${proposalsToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    expect(await response.json()).toEqual({ acknowledged: 2 });
+    expect(await (await fetchProposals()).json()).toEqual({ protocol: 1, proposals: [] });
   });
 });

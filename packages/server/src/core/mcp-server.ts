@@ -8,6 +8,9 @@ import { Schema } from 'effect';
 import type { Bundle, BundleFile, Level } from '../protocol/index.ts';
 import type { Identity } from './access.ts';
 import { type BundleReader, type FolderEntry, normalizePath } from './bundle-reader.ts';
+import { editingInstructions, registerEditingTools } from './editing-tools.ts';
+import type { EditorContext } from './editing.ts';
+import { textResult, toToolSchema } from './mcp-tool.ts';
 
 /**
  * Tool a deployment adds to the MCP server through {@link Extension.registerTool}.
@@ -76,12 +79,15 @@ export const buildMcpServer = async (options: {
   readonly version: string;
   readonly reader: BundleReader;
   readonly caller: Caller;
+  /** Editor the request is served for, who also gets the editing tools. */
+  readonly editor?: EditorContext | undefined;
   readonly extend: ExtendHook | undefined;
 }): Promise<McpServer> => {
-  const { reader, caller } = options;
+  const { reader, caller, editor } = options;
+  const isEditor = editor !== undefined;
   const server = new McpServer(
     { name: options.name, version: options.version },
-    { instructions: instructionsFor(caller) },
+    { instructions: instructionsFor(caller, { isEditor }) },
   );
   const readOnly = { readOnlyHint: true, openWorldHint: false };
 
@@ -94,7 +100,7 @@ export const buildMcpServer = async (options: {
       inputSchema: toToolSchema(ListInput),
       annotations: readOnly,
     },
-    async ({ path }) => textResult(listFolder(reader, caller, path ?? '')),
+    async ({ path }) => textResult(listFolder(reader, caller, { path: path ?? '', isEditor })),
   );
   server.registerTool(
     'read',
@@ -104,7 +110,8 @@ export const buildMcpServer = async (options: {
       inputSchema: toToolSchema(ReadInput),
       annotations: readOnly,
     },
-    async ({ paths }) => textResult(paths.map((path) => readFile(reader, path)).join('\n\n')),
+    async ({ paths }) =>
+      textResult(paths.map((path) => readFile(reader, path, { isEditor })).join('\n\n')),
   );
   server.registerTool(
     'search',
@@ -117,6 +124,8 @@ export const buildMcpServer = async (options: {
     },
     async ({ query, limit }) => textResult(searchFiles(reader, query, limit ?? 10)),
   );
+
+  if (editor !== undefined) registerEditingTools(server, { reader, editor });
 
   await options.extend?.(
     {
@@ -136,22 +145,22 @@ export const buildMcpServer = async (options: {
   return server;
 };
 
-const toToolSchema = <S extends Schema.Decoder<unknown>>(schema: S) =>
-  Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema));
-
-const textResult = (text: string): CallToolResult => ({ content: [{ type: 'text', text }] });
-
-const instructionsFor = (caller: Caller): string =>
+const instructionsFor = (caller: Caller, options: { readonly isEditor: boolean }): string =>
   [
     `This server serves a Markdown knowledge base at the "${caller.level}" access level: you see only what that level may see.`,
     'Use `list` to browse folders, `read` to read files, and `search` to find files by keyword.',
+    options.isEditor ? editingInstructions() : undefined,
     caller.bundle.instructions,
   ]
     .filter((line) => line !== undefined)
     .join('\n\n');
 
-const listFolder = (reader: BundleReader, caller: Caller, path: string): string => {
-  const folder = normalizePath(path);
+const listFolder = (
+  reader: BundleReader,
+  caller: Caller,
+  options: { readonly path: string; readonly isEditor: boolean },
+): string => {
+  const folder = normalizePath(options.path);
   if (reader.isFile(folder)) return `${folder} is a file; use \`read\` to read it.`;
   const entries = reader.list(folder);
   if (entries === undefined) return `Folder not found: ${folder}`;
@@ -160,7 +169,8 @@ const listFolder = (reader: BundleReader, caller: Caller, path: string): string 
   const heading = [`# ${folder === '' ? '/' : `${folder}/`}`, summary].filter(
     (line) => line !== undefined,
   );
-  const instructions = folder === '' ? [instructionsFor(caller)] : [];
+  const instructions =
+    folder === '' ? [instructionsFor(caller, { isEditor: options.isEditor })] : [];
   const lines = entries.length === 0 ? ['(empty)'] : entries.map(formatEntry);
   return [...instructions, heading.join('\n\n'), lines.join('\n')].join('\n\n');
 };
@@ -173,19 +183,30 @@ const formatEntry = (entry: FolderEntry): string => {
   return `- ${entry.path}${description === '' ? '' : `: ${description}`}`;
 };
 
-const readFile = (reader: BundleReader, path: string): string => {
+const readFile = (
+  reader: BundleReader,
+  path: string,
+  options: { readonly isEditor: boolean },
+): string => {
   const file = reader.read(path);
   if (file === undefined) return `# ${normalizePath(path)}\n\nNot found.`;
-  return [`# ${file.path}`, formatMetadata(file), file.content]
+  const build = options.isEditor ? reader.bundle.build.id : undefined;
+  return [`# ${file.path}`, formatMetadata(file, { build }), file.content]
     .filter((part) => part !== '')
     .join('\n\n');
 };
 
-const formatMetadata = (file: BundleFile): string =>
+const formatMetadata = (
+  file: BundleFile,
+  options: { readonly build: string | undefined },
+): string =>
   [
     ['Title', file.title],
     ['Summary', file.summary],
     ['Updated', file.updated],
+    ['Verified', file.verified],
+    ['Review due', file.reviewDue],
+    ['Build', options.build],
     ['URL', file.url],
     ['Visibility', file.visibility],
     ...Object.entries(file.meta ?? {}).map(
