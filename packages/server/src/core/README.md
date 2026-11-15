@@ -58,7 +58,7 @@ A file the caller's level can't see reads as "Not found.", exactly like a missin
 
 ## Status
 
-**stable**, except editing, which is **working:** tested with the official MCP client and in the demo's end-to-end tests, not yet deployed. The rest is tested with the official MCP client, including 2025-era clients, and with Claude web and Claude Code against the deployed demo.
+**stable**, except editing, which is **working:** tested with the official MCP client and in the demo's end-to-end tests, and deployed on the demo, not yet tried from Claude web or mobile. The rest is tested with the official MCP client, including 2025-era clients, and with Claude web and Claude Code against the deployed demo.
 
 Known gaps:
 

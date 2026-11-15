@@ -60,4 +60,4 @@ Both start the Worker in local `workerd` with Wrangler's `createTestHarness`.
 
 ## Status
 
-**stable.** Deployed, and tested at both levels with Claude web and Claude Code. Editing is **working:** tested here end to end, not yet deployed.
+**stable.** Deployed, and tested at both levels with Claude web and Claude Code. Editing is **working:** tested here end to end and deployed, not yet tried from Claude web or mobile.

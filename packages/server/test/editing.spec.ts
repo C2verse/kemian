@@ -22,7 +22,6 @@ const cli = fileURLToPath(new URL('../src/bundler/cli.ts', import.meta.url));
 const robin: Identity = { provider: 'github', id: '12345', name: 'robin' };
 const proposalsToken = 'proposals-token';
 const githubToken = 'github-token';
-const CLI_TIMEOUT = 60_000;
 
 const files: Readonly<Record<string, string>> = {
   'kemian.config.ts':
@@ -148,39 +147,35 @@ describe('editing, from an agent to pull requests', () => {
     expect(await proposals.list()).toHaveLength(4);
   });
 
-  it(
-    'turns them into reviewed pull requests and a direct commit with kemian proposals pull',
-    { timeout: CLI_TIMEOUT },
-    async () => {
-      const summaryPath = join(root, '..', `${root.split('/').at(-1) ?? ''}-summary.md`);
-      const { code, output } = await pullWithCli(summaryPath);
-      expect(output).toContain('4 proposal(s):');
-      expect(code).toBe(0);
+  it('turns them into reviewed pull requests and a direct commit with kemian proposals pull', async () => {
+    const summaryPath = join(root, '..', `${root.split('/').at(-1) ?? ''}-summary.md`);
+    const { code, output } = await pullWithCli(summaryPath);
+    expect(output).toContain('4 proposal(s):');
+    expect(code).toBe(0);
 
-      expect(github.pulls.map((pull) => pull.title)).toEqual([
-        'Edit projects/lantern.md',
-        'Note: Robin is speaking at a meetup',
-        'Retire obsolete journal/old.md',
-      ]);
-      expect(github.statuses.every((status) => status.state === 'success')).toBe(true);
-      const editBranch = github.pulls[0]?.head ?? '';
-      expect(github.filesOf(editBranch).get('projects/lantern.md')).toContain(
-        'YAML and TOML files completion. <private>It earns 95,000 a year.</private>',
-      );
-      expect(github.pulls[0]?.body).toContain('+ Lantern gives YAML and TOML files completion.');
-      expect(github.pulls[0]?.body).not.toContain('95,000');
-      expect(github.filesOf(github.pulls[2]?.head ?? '').get('journal/old.md')).toContain(
-        'status: archived',
-      );
-      expect(github.filesOf('main').get('journal/move.md')).toContain(
-        `verified: ${new Date().toISOString().slice(0, 10)}`,
-      );
-      expect(await proposals.list()).toEqual([]);
-      expect(await readFile(summaryPath, 'utf8')).toContain('## Kemian Proposals');
-    },
-  );
+    expect(github.pulls.map((pull) => pull.title)).toEqual([
+      'Edit projects/lantern.md',
+      'Note: Robin is speaking at a meetup',
+      'Retire obsolete journal/old.md',
+    ]);
+    expect(github.statuses.every((status) => status.state === 'success')).toBe(true);
+    const editBranch = github.pulls[0]?.head ?? '';
+    expect(github.filesOf(editBranch).get('projects/lantern.md')).toContain(
+      'YAML and TOML files completion. <private>It earns 95,000 a year.</private>',
+    );
+    expect(github.pulls[0]?.body).toContain('+ Lantern gives YAML and TOML files completion.');
+    expect(github.pulls[0]?.body).not.toContain('95,000');
+    expect(github.filesOf(github.pulls[2]?.head ?? '').get('journal/old.md')).toContain(
+      'status: archived',
+    );
+    expect(github.filesOf('main').get('journal/move.md')).toContain(
+      `verified: ${new Date().toISOString().slice(0, 10)}`,
+    );
+    expect(await proposals.list()).toEqual([]);
+    expect(await readFile(summaryPath, 'utf8')).toContain('## Kemian Proposals');
+  });
 
-  it('finds nothing left on the next run', { timeout: CLI_TIMEOUT }, async () => {
+  it('finds nothing left on the next run', async () => {
     const { code, output } = await pullWithCli(join(root, '..', 'unused-summary.md'));
     expect(output).toContain('No pending proposals.');
     expect(code).toBe(0);

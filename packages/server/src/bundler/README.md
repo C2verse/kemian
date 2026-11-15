@@ -48,7 +48,7 @@ For each pending proposal, oldest first, `pullProposals`:
 
 ## Status
 
-**stable**, except `proposals pull`, which is **working:** tested against a fake GitHub, end to end from the MCP tools, and as a dry run against the demo Worker, not yet against GitHub. The rest is tested on the fixture and on edge cases of the markup, and publishing the first real deployment's knowledge base.
+**stable**, except `proposals pull`, which is **working:** tested against a fake GitHub, end to end from the MCP tools, and as a dry run against the demo Worker, local and deployed, not yet against GitHub. The rest is tested on the fixture and on edge cases of the markup, and publishing the first real deployment's knowledge base.
 
 Known gaps:
 

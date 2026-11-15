@@ -12,22 +12,22 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 ## Milestones
 
-| Milestone                      | Status  | What's left                                                                                        |
-| ------------------------------ | ------- | -------------------------------------------------------------------------------------------------- |
-| M0: workspace                  | done    |                                                                                                    |
-| M1: public MVP on Cloudflare   | done    |                                                                                                    |
-| M2: private level              | done    |                                                                                                    |
-| M3: first real deployment      | done    |                                                                                                    |
-| M4: editing                    | working | Release it, deploy it to the demo and the first deployment, and try it with Claude web and mobile. |
-| M5: chat backend               | planned | Everything: a chat module adding a `/chat` route.                                                  |
-| M6: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold.                       |
+| Milestone                      | Status  | What's left                                                                              |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| M0: workspace                  | done    |                                                                                          |
+| M1: public MVP on Cloudflare   | done    |                                                                                          |
+| M2: private level              | done    |                                                                                          |
+| M3: first real deployment      | done    |                                                                                          |
+| M4: editing                    | working | Publish 0.2.0, enable it on the first deployment, and try it with Claude web and mobile. |
+| M5: chat backend               | planned | Everything: a chat module adding a `/chat` route.                                        |
+| M6: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold.             |
 
 ## Next Steps
 
 In order:
 
-1. Release `@kemian/server` 0.2.0 with editing, the bundler's `.gitignore` support, and stricter link checks, and drop the now redundant `dist/**` exclude from the author's config.
-2. M4: set `KEMIAN_PROPOSALS_TOKEN` on the demo and deploy it, add `review` intervals, editors, and the proposals workflow to the first deployment, and try the editing tools from Claude web and mobile.
+1. Publish `@kemian/server` 0.2.0 (editing, the bundler's `.gitignore` support, and stricter link checks) once the editing pull request is merged, and drop the now redundant `dist/**` exclude from the author's config.
+2. M4: add `review` intervals, editors, and the proposals workflow to the first deployment, and try the editing tools from Claude web and mobile. The demo already runs editing (deployed 2026-11-15).
 3. M5: settle the chat's open questions below, then add the chat module.
 
 ## Open Questions

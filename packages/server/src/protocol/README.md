@@ -28,7 +28,7 @@ A bundle may say it's the **highest** level's with `highest: true`, which lets t
 
 ## Status
 
-**stable.** Protocol version 1. Proposals are **working:** tested between the server and the CLI, not yet deployed.
+**stable.** Protocol version 1. Proposals are **working:** tested between the server and the CLI, and deployed on the demo.
 
 Known gaps:
 

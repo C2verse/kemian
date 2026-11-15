@@ -4,7 +4,7 @@ Serve one Markdown knowledge base to different audiences over MCP. Private conte
 
 The name is 刻面 (_kèmiàn_), the gemology term for "facet": one body of knowledge, a different face for each viewer.
 
-**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code, and the first real deployment is live. Editing, where agents propose changes that land as pull requests, works locally and isn't deployed yet. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
+**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code, and the first real deployment is live. Editing, where agents propose changes that land as pull requests, runs on the demo and isn't enabled on the first deployment yet. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
