@@ -12,24 +12,30 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 ## Milestones
 
-| Milestone                      | Status  | What's left                                                                  |
-| ------------------------------ | ------- | ---------------------------------------------------------------------------- |
-| M0: workspace                  | done    |                                                                              |
-| M1: public MVP on Cloudflare   | done    |                                                                              |
-| M2: private level              | done    |                                                                              |
-| M3: first real deployment      | done    |                                                                              |
-| M4: chat backend               | planned | Everything: a chat module adding a `/chat` route.                            |
-| M5: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold. |
+| Milestone                      | Status  | What's left                                                                     |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------- |
+| M0: workspace                  | done    |                                                                                 |
+| M1: public MVP on Cloudflare   | done    |                                                                                 |
+| M2: private level              | done    |                                                                                 |
+| M3: first real deployment      | done    |                                                                                 |
+| M4: editing                    | planned | Everything: the editing tools, the proposal queue, and `kemian proposals pull`. |
+| M5: chat backend               | planned | Everything: a chat module adding a `/chat` route.                               |
+| M6: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold.    |
 
 ## Next Steps
 
 In order:
 
 1. Release the bundler's `.gitignore` support and stricter link checks, and drop the now redundant `dist/**` exclude from the author's config.
-2. M4: settle the chat's open questions below, then add the chat module.
+2. M4: build editing as designed in [design.md](design.md#editing), settling its open questions below first.
+3. M5: settle the chat's open questions below, then add the chat module.
 
 ## Open Questions
 
+- TODO: Whether review intervals for `list_stale` live in `kemian.config.ts`, shipped in the bundle, or in the Worker's options.
+- TODO: How the CI job authenticates to `/proposals`: with the publish token or a separate token that can only read and acknowledge proposals.
+- TODO: Where conflicted proposals surface: a GitHub issue, the CI run's summary, or a tool for editors.
+- TODO: How a `current` verdict lands without review: committed straight to the default branch, or as a pull request set to merge itself.
 - TODO: What ChatGPT support takes. It may need tools named `search` and `fetch` with specific shapes (unverified).
 - TODO: Whether a level without its own instructions falls back to the nearest lower level's. Now it gets only the generic text, so the demo's private level misses the public guidance.
 - TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing the markup.
@@ -54,6 +60,5 @@ In order:
 
 - Replace `?access=<level>` with MCP step-up authorization (403 `insufficient_scope`) once clients handle it. Claude Code had open bugs on this as of 2026-10-20 ([#44652](https://github.com/anthropics/claude-code/issues/44652), [#68720](https://github.com/anthropics/claude-code/issues/68720)).
 - Pulling bundle sets from GitHub Actions artifacts, as an alternative to pushing.
-- A `propose_edit` tool that opens a pull request on the content repo, with the bundler's check run on the PR.
 - Semantic search.
 - Encryption of non-public bundles, only if bundles ever need storage more visible than their source.

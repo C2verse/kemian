@@ -181,7 +181,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **Clients:** Claude (web and Code) is tested against the deployed demo, and ChatGPT will be supported too (decided 2026-11-14).
 - **The credential decides the level.** No token resolves to the configured anonymous level (`public` by default, or none to require login). A token resolves to an identity, and configuration maps it to a level. A caller with no matching level sees nothing. The level is resolved on every request, so configuration changes apply immediately.
 - **`/mcp?access=<level>` triggers a login.** Clients like Claude web only start OAuth after a 401, and an endpoint that accepts anonymous requests never sends one. The argument only makes the server demand a login; the token alone decides what a request sees.
-- **Read-only** in v1.
+- **Read-only for everyone but editors**, who also get the [editing tools](#editing).
 - **Instructions:** the bundle's `instructions` go into the MCP initialize response and state the access level explicitly. Because not every client shows server instructions to the model, they're also returned from `list("/")`.
 - **Implementation:** `core` builds a fresh MCP server for every request with the caller's bundle and instructions, and serves it with the MCP SDK v2's `createMcpHandler`. That serves 2025-era clients statelessly and the 2026-07-28 revision per request, so nothing depends on sessions surviving between requests or Worker instances. Tool inputs are Effect schemas passed to the SDK as Standard Schema.
 - **Responses:** a caller whose identity maps to no level gets 403; before the first publish, every caller gets 503. A file the caller's level can't see reads as "Not found.", exactly like a missing one.
@@ -201,6 +201,63 @@ A deployment's Worker imports Kemian as one feature and can add its own:
 
 - **Custom tools** through an `extend` hook. The hook receives a `registerTool({ name, description, input, handler })` function, where `input` is a [Standard Schema](https://standardschema.dev) that also implements Standard JSON Schema (zod 4, Valibot, ArkType, or Effect via `Schema.toStandardJSONSchemaV1`), and `handler` returns text or an MCP tool result. It also receives the caller's resolved level, bundle, and identity, never the store, so custom code can't read another level's bundle by accident.
 - **Custom routes** through a `fallback` handler for requests that aren't MCP, OAuth, or publishing (e.g. a `/chat` route).
+
+## Editing
+
+Agents can write back (decided 2026-11-14): capture findings while chatting, and quiz the author daily on facts that may be stale. Only clients without a checkout of the content repo need this: Claude web and mobile, and scheduled personal agents. A coding agent with a checkout edits the files and opens pull requests itself.
+
+### The Server Only Queues Proposals
+
+```
+agent ─▶ editing tool ─▶ proposal queue (R2) ◀── content repo CI: kemian proposals pull
+                                                   ├─ applies each proposal on its own branch and opens a PR
+                                                   └─ runs kemian check and a per-level diff on the PR
+merge ─▶ kemian publish ─▶ bundles
+```
+
+- **The server never writes to the knowledge base.** It holds only redacted bundles, so it can't edit the source, and an edit to a bundle would be overwritten by the next publish. Editing tools append proposals to a queue instead.
+- **The content repo pulls.** A scheduled CI job runs `kemian proposals pull`, which applies each proposal to the current source on its own branch and opens a pull request with the job's built-in `GITHUB_TOKEN`. The server still holds no GitHub credentials, so a stolen token or an injected agent can add proposals but can't change what anyone reads. Proposals appear at the next pull, which is soon enough for notes and quizzes.
+- **Edits go through the same checks as everything else.** Every pull request runs `kemian check` and posts what each level below the highest gains or loses. An edit that adds, removes, or moves a level tag, or changes `visibility`, fails the check, so merging it takes the author's deliberate override.
+- **Nothing merges without review**, except a `current` verdict from `resolve_stale`, which only sets a date and changes no content.
+- **The queue lives in R2** beside the bundles, which hold content of the same sensitivity, so it needs no new binding or trust boundary.
+
+### Tools
+
+| Tool            | Input                                                                    | Proposes                                                                        |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `note`          | `title`, `body`, optional `about` (paths) and `sources`                  | A new file under the configured notes folder, e.g. `inbox/2026-11-14-<slug>.md` |
+| `propose_edit`  | `path`, `build` (the build ID it read), `edits` (`old`, `new`), `reason` | Exact replacements in one file                                                  |
+| `list_stale`    | `limit`, optional `folder`                                               | Nothing: lists files due for review, most overdue first                         |
+| `resolve_stale` | `path`, `verdict`, optional `edits` and `note`                           | Depends on the verdict, below                                                   |
+
+- **Names are actions,** like `list`, `read`, and `search`.
+- **`note` is the default way to write.** Most findings belong in the inbox for the author to sort, not in curated files. A note never conflicts, since each gets a new path.
+- **`propose_edit` matches snippets, not line numbers.** When the proposal is applied, each `old` must occur exactly once in the current source; otherwise the proposal is marked conflicted, never forced or fuzzily merged. Snippets the agent saw also occur in the source, because the highest level's bundle keeps the body's tags and comments.
+- **`list_stale` ranks by data the bundle already has:** each file's `verified` date (a frontmatter key copied through like `updated`), else its `updated` date, against a review interval per `status`, e.g. 30 days for `evolving` and 180 for `stable`. Kemian doesn't model individual claims: the agent reads the stale files, picks what to ask, and records the answers with `resolve_stale`.
+
+`resolve_stale` takes one of three verdicts:
+
+| Verdict    | Proposes                                                                                           | Review                        |
+| ---------- | -------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `current`  | Setting `verified` to today; applying it keeps the later date, so verdicts apply in any order      | Merged without review         |
+| `outdated` | The given `edits`, as `propose_edit` would                                                         | Pull request                  |
+| `obsolete` | Deleting the file if it's in the notes folder, else setting `status: archived` (both configurable) | Pull request, never automatic |
+
+- **There's no delete tool.** Retiring a file is one answer to "is this still true?", not an action of its own, and a standalone delete is the easiest tool for injected text to abuse. Only notes, which are meant to be temporary, are ever deleted; curated files are archived, so nothing linking to them breaks, and Git keeps both.
+- **`obsolete` is tied to the file the agent read.** If the file changed since that build, the proposal is conflicted, so a note extended in the meantime isn't deleted on the strength of its old version.
+
+### Access & Limits
+
+- **Only editors see the editing tools:** identities on a configured `editors` list, who must also resolve to the highest level. Lower levels read redacted content, so their edits would destroy what they can't see; anonymous callers never write.
+- **New content starts at the highest level.** A note always gets `visibility: <highest>`; only the author lowers it, in review.
+- **Everything an agent writes is untrusted,** since the conversation may have read injected text. Proposals are capped in size, rate-limited per identity per day, and confined to configured paths: notes only in the notes folder. Each carries a client-supplied ID, so a retried call doesn't duplicate it.
+
+### Where It Lives
+
+- **`protocol`:** the `Proposal` schema, shared by the server and the CLI.
+- **`core`:** the four tools and a `ProposalStore` interface beside `BundleStore`.
+- **`cloudflare`:** a `ProposalStore` on R2, and `/proposals` routes for the CI job to read and acknowledge proposals.
+- **`bundler`:** `kemian proposals pull`.
 
 ## Chat Backend
 
