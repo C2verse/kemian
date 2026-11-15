@@ -1,6 +1,6 @@
 {
   "name": "@kemian/server",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Serves one Markdown knowledge base to different audiences over MCP.",
   "license": "Apache-2.0",
   "repository": {
