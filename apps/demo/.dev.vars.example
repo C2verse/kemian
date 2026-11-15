@@ -1,2 +1,3 @@
 KEMIAN_PUBLISH_TOKEN=local-publish-token
+KEMIAN_PROPOSALS_TOKEN=local-proposals-token
 GITHUB_CLIENT_SECRET=

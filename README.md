@@ -4,24 +4,26 @@ Serve one Markdown knowledge base to different audiences over MCP. Private conte
 
 The name is 刻面 (_kèmiàn_), the gemology term for "facet": one body of knowledge, a different face for each viewer.
 
-**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code, and the first real deployment is live. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
+**Status:** the MVP works. The demo is deployed on Cloudflare and tested at both levels with Claude web and Claude Code, and the first real deployment is live. Editing, where agents propose changes that land as pull requests, works locally and isn't deployed yet. Progress, next steps, open questions, and known gaps are in the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
   KB["Knowledge base<br/>Markdown + privacy markup"]
-  CLI["kemian CLI<br/>check · build · publish"]
-  W["Kemian Worker<br/>/publish · /mcp · sign-in"]
-  R2[("R2<br/>one bundle per level")]
+  CLI["kemian CLI<br/>check · build · publish · proposals pull"]
+  W["Kemian Worker<br/>/publish · /mcp · /proposals · sign-in"]
+  R2[("R2<br/>one bundle per level<br/>+ proposal queue")]
   C["MCP clients<br/>Claude, chat widgets, …"]
   GH["GitHub<br/>identity only"]
   KB --> CLI -->|"bundle set + token"| W --> R2
   C -->|"anonymous or signed in"| W
   W -.->|"sign-in"| GH
+  W -.->|"editors' proposals"| CLI
+  CLI -.->|"pull requests"| KB
 ```
 
-Redaction happens in the CLI, before anything leaves the author's machine or CI. The server only ever holds bundles, and each request sees exactly one level's bundle.
+Redaction happens in the CLI, before anything leaves the author's machine or CI. The server only ever holds bundles, and each request sees exactly one level's bundle. It never writes to the knowledge base: editors' changes wait in a queue until the content repo's CI pulls them into pull requests.
 
 ## Vocabulary
 
@@ -32,6 +34,7 @@ Terms used across the codebase, each defined in full where it's owned:
 - **Bundle**: everything one level may see from one build, already redacted. **Bundle set**: every level's bundle from one build, published and replaced together. See [`protocol`](packages/server/src/protocol/README.md).
 - **Search index**: a prebuilt index of one bundle's files, shipped inside it. See [`search`](packages/server/src/search/README.md).
 - **Identity**: who a caller is, like `github:12345`, mapped to a level by configuration. **Sign-in provider**: what establishes an identity. See [`core`](packages/server/src/core/README.md).
+- **Proposal**: a change an editor's agent suggests through the editing tools, such as a note or an edit, queued by the server until `kemian proposals pull` turns it into a pull request. **Editor**: an identity allowed to propose, at the highest level. See [`core`](packages/server/src/core/README.md) and [`bundler`](packages/server/src/bundler/README.md).
 - **Module**: one folder of `packages/server/src`, with its own export and import rules. See the [source overview](packages/server/src/README.md).
 
 ## Components

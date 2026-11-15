@@ -1,11 +1,18 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { Effect, Schema } from 'effect';
 
-import { decodeBundleSet, type Level } from '../protocol/index.ts';
-import { type Identity, makeAccessPolicy, resolveLevel } from './access.ts';
+import {
+  type Bundle,
+  decodeBundleSet,
+  type Level,
+  ProposalAcknowledgement,
+} from '../protocol/index.ts';
+import { type Identity, identityKeyOf, makeAccessPolicy, resolveLevel } from './access.ts';
 import { BundleReader } from './bundle-reader.ts';
 import { type BundleStore, type BundleStoreError, fromStore } from './bundle-store.ts';
+import type { EditingOptions, EditorContext } from './editing.ts';
 import { buildMcpServer, type ExtendHook } from './mcp-server.ts';
+import { fromProposalStore } from './proposal-store.ts';
 
 /**
  * Options of a Kemian server.
@@ -25,6 +32,8 @@ export interface KemianOptions {
   readonly version?: string;
   /** Adds deployment-specific tools for each request. */
   readonly extend?: ExtendHook;
+  /** Lets editors propose changes through the editing tools. Read-only for everyone without it. */
+  readonly editing?: EditingOptions;
 }
 
 /**
@@ -38,6 +47,8 @@ export interface Kemian {
   ) => Promise<Response>;
   /** Serves a `kemian publish` request. */
   readonly handlePublish: (request: Request) => Promise<Response>;
+  /** Serves a `kemian proposals pull` request: `GET /proposals` lists, `POST /proposals/acknowledge` drops. */
+  readonly handleProposals: (request: Request) => Promise<Response>;
   /** Returns the level a caller with the given identity sees, if any. */
   readonly resolveLevel: (identity: Identity | undefined) => Level | undefined;
 }
@@ -53,6 +64,7 @@ class LevelNotPublishedError extends Schema.TaggedError<
 >()('LevelNotPublishedError', { level: Schema.String }) {}
 
 const MAX_CACHED_READERS = 16;
+const DEFAULT_MAX_PROPOSALS_PER_DAY = 50;
 
 /**
  * Creates a Kemian server.
@@ -65,6 +77,17 @@ export const createKemian = (options: KemianOptions): Kemian => {
     levels: options.levels ?? {},
   });
   const readers = new ReaderCache(options.store);
+  const editors = new Set(options.editing?.editors ?? []);
+  const editorFor = (identity: Identity | undefined, bundle: Bundle): EditorContext | undefined => {
+    const editing = options.editing;
+    if (editing === undefined || identity === undefined) return undefined;
+    if (bundle.highest !== true || !editors.has(identityKeyOf(identity))) return undefined;
+    return {
+      identity,
+      proposals: editing.proposals,
+      maxProposalsPerDay: editing.maxProposalsPerDay ?? DEFAULT_MAX_PROPOSALS_PER_DAY,
+    };
+  };
 
   const handleMcp = (request: Request, context: { readonly identity: Identity | undefined }) =>
     Effect.gen(function* () {
@@ -78,6 +101,7 @@ export const createKemian = (options: KemianOptions): Kemian => {
           version: options.version ?? '0.0.0',
           reader,
           caller,
+          editor: editorFor(context.identity, reader.bundle),
           extend: options.extend,
         }),
       );
@@ -101,8 +125,7 @@ export const createKemian = (options: KemianOptions): Kemian => {
       if (options.publishToken === undefined || options.publishToken === '') {
         return jsonError(403, 'Publishing is disabled: no publish token is configured.');
       }
-      const token = /^Bearer (.+)$/u.exec(request.headers.get('authorization') ?? '')?.[1] ?? '';
-      if (!(yield* Effect.promise(() => isEqualSecret(token, options.publishToken ?? '')))) {
+      if (!(yield* Effect.promise(() => isBearer(request, options.publishToken ?? '')))) {
         return jsonError(401, 'Invalid publish token.');
       }
       const body = yield* Effect.tryPromise(() => request.json()).pipe(Effect.option);
@@ -125,7 +148,46 @@ export const createKemian = (options: KemianOptions): Kemian => {
       Effect.runPromise,
     );
 
-  return { handleMcp, handlePublish, resolveLevel: (identity) => resolveLevel(policy, identity) };
+  const handleProposals = (request: Request) =>
+    Effect.gen(function* () {
+      const editing = options.editing;
+      const proposalsToken = editing?.proposalsToken ?? '';
+      if (editing === undefined || proposalsToken === '') {
+        return jsonError(403, 'Reading proposals is disabled: no proposals token is configured.');
+      }
+      if (!(yield* Effect.promise(() => isBearer(request, proposalsToken)))) {
+        return jsonError(401, 'Invalid proposals token.');
+      }
+      const isAcknowledgement = new URL(request.url).pathname.endsWith('/acknowledge');
+      if (!isAcknowledgement) {
+        if (request.method !== 'GET') return jsonError(405, 'Use GET to list proposals.');
+        const proposals = yield* fromProposalStore(() => editing.proposals.list());
+        return Response.json({ protocol: 1, proposals });
+      }
+      if (request.method !== 'POST') return jsonError(405, 'Use POST to acknowledge proposals.');
+      const body = yield* Effect.tryPromise(() => request.json()).pipe(Effect.option);
+      if (body._tag === 'None') return jsonError(400, 'The body must be JSON.');
+      const acknowledgement = yield* Schema.decodeUnknownEffect(ProposalAcknowledgement)(
+        body.value,
+      ).pipe(Effect.option);
+      if (acknowledgement._tag === 'None') {
+        return jsonError(400, 'The body must be { "ids": [...] } with proposal IDs.');
+      }
+      yield* fromProposalStore(() => editing.proposals.acknowledge(acknowledgement.value.ids));
+      return Response.json({ acknowledged: acknowledgement.value.ids.length });
+    }).pipe(
+      Effect.catchTags({
+        ProposalStoreError: (error) => Effect.succeed(jsonError(500, error.message)),
+      }),
+      Effect.runPromise,
+    );
+
+  return {
+    handleMcp,
+    handlePublish,
+    handleProposals,
+    resolveLevel: (identity) => resolveLevel(policy, identity),
+  };
 };
 
 class ReaderCache {
@@ -164,6 +226,11 @@ class ReaderCache {
 
 const jsonError = (status: number, message: string): Response =>
   Response.json({ error: message }, { status });
+
+const isBearer = (request: Request, expected: string): Promise<boolean> => {
+  const token = /^Bearer (.+)$/u.exec(request.headers.get('authorization') ?? '')?.[1] ?? '';
+  return isEqualSecret(token, expected);
+};
 
 const isEqualSecret = async (given: string, expected: string): Promise<boolean> => {
   const encoder = new TextEncoder();

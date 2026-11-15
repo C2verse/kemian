@@ -68,4 +68,13 @@ describe('packed @kemian/server', () => {
     });
     expect(stderr).toContain('0 error(s), 0 warning(s)');
   });
+
+  it('runs the proposals subcommand of the kemian binary', async () => {
+    const { stdout } = await run(
+      'node',
+      [join(packed, manifest.bin['kemian'] ?? ''), 'proposals', 'pull', '--help'],
+      { cwd: fixture },
+    );
+    expect(stdout).toContain('kemian proposals pull [flags]');
+  });
 });

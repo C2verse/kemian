@@ -78,6 +78,7 @@ Protocol version 1:
 interface Bundle {
   protocol: 1;
   level: string;
+  highest?: boolean; // true only in the highest level's bundle
   build: { id: string; createdAt: string; source?: string }; // source: e.g. a commit SHA
   instructions?: string;
   search?: { format: string; data: unknown }; // prebuilt search index of this bundle's files
@@ -88,6 +89,8 @@ interface Bundle {
     title?: string;
     summary?: string;
     updated?: string; // YYYY-MM-DD
+    verified?: string; // YYYY-MM-DD, when the file was last confirmed true
+    reviewDue?: string; // YYYY-MM-DD, only in the highest level's bundle
     url?: string;
     meta?: Record<string, JsonValue>; // allowlisted frontmatter only
     content: string; // Markdown without frontmatter, redacted for this level
@@ -134,13 +137,15 @@ export default defineConfig({
   filter: ({ level, frontmatter }) => level !== 'public' || frontmatter['status'] !== 'draft',
   instructions: { public: 'meta/public-instructions.md', private: 'AGENTS.md' },
   url: ({ path }) => `https://example.com/${path}`,
+  review: { intervals: { evolving: 30, stable: 180 } }, // days until a file of each status is due for review
+  proposals: { notes: 'inbox' }, // where `kemian proposals pull` puts new notes
 });
 ```
 
 - `searchIndex: false` leaves the prebuilt index out of bundles.
 - Hooks can only leave content out: `filter` drops files from a level, and a hook that throws or returns anything but `true` drops the file too.
 - `.gitignore` files inside the knowledge base are honored, so build output such as `dist/` needs no `exclude`. Parent folders' `.gitignore` files and Git's global excludes aren't read, so a build doesn't depend on where the folder sits or on the machine.
-- The CLI is `kemian check`, `kemian build` (to `dist/kemian/bundle-set.json`), and `kemian publish` (to a server's `/publish`, with the token from `KEMIAN_PUBLISH_TOKEN`); each exits with code 1 when there are errors.
+- The CLI is `kemian check`, `kemian build` (to `dist/kemian/bundle-set.json`), `kemian publish` (to a server's `/publish`, with the token from `KEMIAN_PUBLISH_TOKEN`), and `kemian proposals pull` (see [Editing](#editing)); each exits with code 1 when there are errors.
 
 Worker (`apps/demo` is a complete example):
 
@@ -151,13 +156,18 @@ export default kemian((env: Env) => ({
   levels: { private: ['github:12345'] }, // identities per level
   publishToken: env.KEMIAN_PUBLISH_TOKEN,
   signIn: githubSignIn({ clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }),
+  editing: {
+    proposals: r2ProposalStore(env.BUNDLES),
+    editors: ['github:12345'],
+    proposalsToken: env.KEMIAN_PROPOSALS_TOKEN,
+  },
   extend({ registerTool }, { level, bundle, identity }) {},
   fallback: (request, env, ctx) => new Response('…'),
 }));
 ```
 
 - Options are built once per Worker environment, so reader and search caches survive across requests in a Worker instance.
-- Routes: `/mcp` (with permissive CORS, since access is decided by bearer tokens, not cookies), `/publish`, the OAuth endpoints when sign-in is configured (`/authorize`, `/callback`, `/token`, `/register`, `/.well-known/…`), and everything else to `fallback` (404 by default).
+- Routes: `/mcp` (with permissive CORS, since access is decided by bearer tokens, not cookies), `/publish`, `/proposals` and `/proposals/acknowledge` when editing is configured, the OAuth endpoints when sign-in is configured (`/authorize`, `/callback`, `/token`, `/register`, `/.well-known/…`), and everything else to `fallback` (404 by default).
 
 ## Pipeline
 
@@ -169,7 +179,7 @@ content repo ── kemian build ──▶ bundle set ── kemian publish ─�
 - **The content repo pushes.** Its CI runs `kemian publish`, which sends the bundle set to the Worker's `PUT /publish` with a bearer token. A leaked token lets someone replace the content, but not read it.
 - **`/publish` validates against the protocol and replaces all levels together.** If validation fails, the current build stays, so a broken build never takes the server down.
 - **The `BundleStore` is on R2.** It writes a build's bundles under the build's ID, then switches a pointer to it; R2 is strongly consistent, so readers see one build or the other, never a mix. It keeps the previous build for readers still on it and deletes older ones. KV holds only OAuth tokens (M2).
-- **Credentials:** the content repo holds the publish token. The server holds no GitHub credentials.
+- **Credentials:** the content repo holds the publish token, and the proposals token when editing is on. The server holds no GitHub credentials.
 
 ## MCP Server
 
@@ -211,14 +221,19 @@ Agents can write back (decided 2026-11-14): capture findings while chatting, and
 ```
 agent ─▶ editing tool ─▶ proposal queue (R2) ◀── content repo CI: kemian proposals pull
                                                    ├─ applies each proposal on its own branch and opens a PR
-                                                   └─ runs kemian check and a per-level diff on the PR
+                                                   └─ posts kemian check and a per-level diff on the PR
 merge ─▶ kemian publish ─▶ bundles
 ```
 
 - **The server never writes to the knowledge base.** It holds only redacted bundles, so it can't edit the source, and an edit to a bundle would be overwritten by the next publish. Editing tools append proposals to a queue instead.
 - **The content repo pulls.** A scheduled CI job runs `kemian proposals pull`, which applies each proposal to the current source on its own branch and opens a pull request with the job's built-in `GITHUB_TOKEN`. The server still holds no GitHub credentials, so a stolen token or an injected agent can add proposals but can't change what anyone reads. Proposals appear at the next pull, which is soon enough for notes and quizzes.
-- **Edits go through the same checks as everything else.** Every pull request runs `kemian check` and posts what each level below the highest gains or loses. An edit that adds, removes, or moves a level tag, or changes `visibility`, fails the check, so merging it takes the author's deliberate override.
+- **The pull job authenticates with its own proposals token** (decided 2026-11-14), not the publish token. Proposals hold highest-level content, and the publish token was chosen to replace content without reading it; sharing it would let a leaked publish token read the queue. The proposals token can only list and acknowledge proposals.
+- **Edits go through the same checks as everything else.** The pull job reviews each proposal before opening its pull request: it runs the bundler on the source before and after, lists the new problems, and posts what each level below the highest gains or loses. An edit that adds, removes, or moves a level tag or an HTML comment, or changes `visibility`, fails the check, so merging it takes the author's deliberate override, and so does any change after which a lower level sees a file it didn't, e.g. archiving a draft that the `filter` hid. Moves are caught from the edit itself: an `old` or `new` snippet that contains a tag, since content moved across a tag leaves the tags unchanged. Tags are compared both as written and as the parser reads them, so restricted content an edit turns into code, which the parser treats as literal text, fails too.
+- **The check is a commit status** (`kemian/check`) that the pull job posts, plus the review in the pull request's body. Pull requests opened with `GITHUB_TOKEN` don't trigger the content repo's own workflows, so the job can't rely on them. Requiring the status in a branch rule would also block the author's own pushes, which never get it, so a failed check marks the pull request instead of blocking it.
 - **Nothing merges without review**, except a `current` verdict from `resolve_stale`, which only sets a date and changes no content.
+- **`current` verdicts are committed straight to the default branch** (decided 2026-11-14), all of a run's verdicts in one commit, fast-forwarded from the commit the job checked out. A pull request set to merge itself would need the repository's auto-merge setting and a required check, and pull requests from `GITHUB_TOKEN` trigger no checks. When GitHub refuses the commit, e.g. on a protected branch, or the review flags anything, the verdicts become a pull request instead.
+- **A proposal that no longer applies becomes a note** (decided 2026-11-14): a pull request adding a note that names the proposal, why it conflicted, and its edits, so the finding still reaches the author in the same review queue. It needs no permission beyond pull requests, unlike issues, and nothing is lost. A `current` verdict that can't be applied, on a file that's gone or with malformed frontmatter, is only reported in the job's summary, since a note about it would be noise.
+- **One failure doesn't stall the queue.** A proposal GitHub refuses stays queued for the next run while the rest go ahead, and the job fails so the author notices; a stored proposal that can't be read is logged and skipped.
 - **The queue lives in R2** beside the bundles, which hold content of the same sensitivity, so it needs no new binding or trust boundary.
 
 ### Tools
@@ -228,12 +243,15 @@ merge ─▶ kemian publish ─▶ bundles
 | `note`          | `title`, `body`, optional `about` (paths) and `sources`                  | A new file under the configured notes folder, e.g. `inbox/2026-11-14-<slug>.md` |
 | `propose_edit`  | `path`, `build` (the build ID it read), `edits` (`old`, `new`), `reason` | Exact replacements in one file                                                  |
 | `list_stale`    | `limit`, optional `folder`                                               | Nothing: lists files due for review, most overdue first                         |
-| `resolve_stale` | `path`, `verdict`, optional `edits` and `note`                           | Depends on the verdict, below                                                   |
+| `resolve_stale` | `path`, `build`, `verdict`, optional `edits` and `note`                  | Depends on the verdict, below                                                   |
 
 - **Names are actions,** like `list`, `read`, and `search`.
+- **Editors see the build ID** when they read a file, to pass back with proposals that touch it.
+- **Edits are checked when proposed:** the server applies them to the file in the current bundle and refuses edits that don't apply, so the agent can re-read and retry while the author is still in the conversation.
 - **`note` is the default way to write.** Most findings belong in the inbox for the author to sort, not in curated files. A note never conflicts, since each gets a new path.
-- **`propose_edit` matches snippets, not line numbers.** When the proposal is applied, each `old` must occur exactly once in the current source; otherwise the proposal is marked conflicted, never forced or fuzzily merged. Snippets the agent saw also occur in the source, because the highest level's bundle keeps the body's tags and comments.
+- **`propose_edit` matches snippets, not line numbers.** When the proposal is applied, each `old` must occur exactly once in the current source; otherwise the proposal is marked conflicted, never forced or fuzzily merged. Snippets the agent saw almost always occur in the source, because the highest level's bundle keeps the body's tags and comments. The exceptions are tags of the lowest level, which bundles never keep, and every tag under `markers: 'strip'`; edits spanning those conflict and become notes, never a wrong edit.
 - **`list_stale` ranks by data the bundle already has:** each file's `verified` date (a frontmatter key copied through like `updated`), else its `updated` date, against a review interval per `status`, e.g. 30 days for `evolving` and 180 for `stable`. Kemian doesn't model individual claims: the agent reads the stale files, picks what to ask, and records the answers with `resolve_stale`.
+- **Review intervals live in `kemian.config.ts`, and the bundler ships each file's due date** (decided 2026-11-14) as `reviewDue`, only in the highest level's bundle. Statuses are the content repo's own vocabulary, and the server knows nothing about frontmatter, so the bundler applies the intervals; a file of a status without an interval is never due, and one with no date is due from its build. Files with a pending verdict are left out, so an agent doesn't ask twice before the next pull.
 
 `resolve_stale` takes one of three verdicts:
 
@@ -248,16 +266,16 @@ merge ─▶ kemian publish ─▶ bundles
 
 ### Access & Limits
 
-- **Only editors see the editing tools:** identities on a configured `editors` list, who must also resolve to the highest level. Lower levels read redacted content, so their edits would destroy what they can't see; anonymous callers never write.
+- **Only editors see the editing tools:** identities on a configured `editors` list, who must also resolve to the highest level. Lower levels read redacted content, so their edits would destroy what they can't see; anonymous callers never write. The server knows a bundle is the highest from its `highest` field, since levels are ordered only in the bundler's configuration; a bundle without it gets no editing tools.
 - **New content starts at the highest level.** A note always gets `visibility: <highest>`; only the author lowers it, in review.
-- **Everything an agent writes is untrusted,** since the conversation may have read injected text. Proposals are capped in size, rate-limited per identity per day, and confined to configured paths: notes only in the notes folder. Each carries a client-supplied ID, so a retried call doesn't duplicate it.
+- **Everything an agent writes is untrusted,** since the conversation may have read injected text. Proposals are capped in size (20,000 characters per text, 20 edits), rate-limited per identity per day (50 by default), and confined to configured paths: notes only in the notes folder, and edits only to the body of a file in the highest level's bundle, never its frontmatter. Each carries an ID derived from the identity, the proposal, and an optional client-supplied ID, so a retried call doesn't duplicate it, and a different proposal that reuses a client ID isn't mistaken for a retry.
 
 ### Where It Lives
 
-- **`protocol`:** the `Proposal` schema, shared by the server and the CLI.
-- **`core`:** the four tools and a `ProposalStore` interface beside `BundleStore`.
-- **`cloudflare`:** a `ProposalStore` on R2, and `/proposals` routes for the CI job to read and acknowledge proposals.
-- **`bundler`:** `kemian proposals pull`.
+- **`protocol`:** the `Proposal` schema, and the meaning of its edits (`applyTextEdits`) and content hashes, shared by the server and the CLI.
+- **`core`:** the four tools, a `ProposalStore` interface beside `BundleStore`, and the handler behind `/proposals`.
+- **`cloudflare`:** a `ProposalStore` on R2, and the `/proposals` routes for the CI job to read and acknowledge proposals, never through sign-in.
+- **`bundler`:** `kemian proposals pull`, talking to GitHub's REST API directly, so the job needs no Git credentials or local commits.
 
 ## Chat Backend
 

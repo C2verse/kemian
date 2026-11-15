@@ -3,6 +3,8 @@ import { Schema } from 'effect';
 import { isEachUnique } from './uniqueness.ts';
 
 const PATH_SEGMENT = String.raw`(?:[^/\\.][^/\\]*|\.[^/\\.][^/\\]*|\.\.[^/\\]+)`;
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
 
 /**
  * Name of an access level, e.g. `public`.
@@ -37,9 +39,7 @@ export type FolderPath = typeof FolderPath.Type;
  */
 export const BuildInfo = Schema.Struct({
   id: Schema.NonEmptyString,
-  createdAt: Schema.String.check(
-    Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u),
-  ),
+  createdAt: Schema.String.check(Schema.isPattern(TIMESTAMP)),
   source: Schema.optionalKey(Schema.NonEmptyString),
 }).annotate({ identifier: 'BuildInfo' });
 export type BuildInfo = typeof BuildInfo.Type;
@@ -61,7 +61,9 @@ export const BundleFile = Schema.Struct({
   visibility: Schema.optionalKey(Level),
   title: Schema.optionalKey(Schema.String),
   summary: Schema.optionalKey(Schema.String),
-  updated: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u))),
+  updated: Schema.optionalKey(Schema.String.check(Schema.isPattern(CALENDAR_DATE))),
+  verified: Schema.optionalKey(Schema.String.check(Schema.isPattern(CALENDAR_DATE))),
+  reviewDue: Schema.optionalKey(Schema.String.check(Schema.isPattern(CALENDAR_DATE))),
   url: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9+.-]*:/u))),
   meta: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
   content: Schema.String,
@@ -85,6 +87,7 @@ export type BundleSearchIndex = typeof BundleSearchIndex.Type;
 export const Bundle = Schema.Struct({
   protocol: Schema.Literal(1),
   level: Level,
+  highest: Schema.optionalKey(Schema.Boolean),
   build: BuildInfo,
   instructions: Schema.optionalKey(Schema.String),
   search: Schema.optionalKey(BundleSearchIndex),

@@ -12,30 +12,26 @@ Each module's `README.md` states its own status and known gaps; this file tracks
 
 ## Milestones
 
-| Milestone                      | Status  | What's left                                                                     |
-| ------------------------------ | ------- | ------------------------------------------------------------------------------- |
-| M0: workspace                  | done    |                                                                                 |
-| M1: public MVP on Cloudflare   | done    |                                                                                 |
-| M2: private level              | done    |                                                                                 |
-| M3: first real deployment      | done    |                                                                                 |
-| M4: editing                    | planned | Everything: the editing tools, the proposal queue, and `kemian proposals pull`. |
-| M5: chat backend               | planned | Everything: a chat module adding a `/chat` route.                               |
-| M6: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold.    |
+| Milestone                      | Status  | What's left                                                                                        |
+| ------------------------------ | ------- | -------------------------------------------------------------------------------------------------- |
+| M0: workspace                  | done    |                                                                                                    |
+| M1: public MVP on Cloudflare   | done    |                                                                                                    |
+| M2: private level              | done    |                                                                                                    |
+| M3: first real deployment      | done    |                                                                                                    |
+| M4: editing                    | working | Release it, deploy it to the demo and the first deployment, and try it with Claude web and mobile. |
+| M5: chat backend               | planned | Everything: a chat module adding a `/chat` route.                                                  |
+| M6: template and Deploy button | planned | Everything, then splitting modules into packages once their boundaries hold.                       |
 
 ## Next Steps
 
 In order:
 
-1. Release the bundler's `.gitignore` support and stricter link checks, and drop the now redundant `dist/**` exclude from the author's config.
-2. M4: build editing as designed in [design.md](design.md#editing), settling its open questions below first.
+1. Release `@kemian/server` 0.2.0 with editing, the bundler's `.gitignore` support, and stricter link checks, and drop the now redundant `dist/**` exclude from the author's config.
+2. M4: set `KEMIAN_PROPOSALS_TOKEN` on the demo and deploy it, add `review` intervals, editors, and the proposals workflow to the first deployment, and try the editing tools from Claude web and mobile.
 3. M5: settle the chat's open questions below, then add the chat module.
 
 ## Open Questions
 
-- TODO: Whether review intervals for `list_stale` live in `kemian.config.ts`, shipped in the bundle, or in the Worker's options.
-- TODO: How the CI job authenticates to `/proposals`: with the publish token or a separate token that can only read and acknowledge proposals.
-- TODO: Where conflicted proposals surface: a GitHub issue, the CI run's summary, or a tool for editors.
-- TODO: How a `current` verdict lands without review: committed straight to the default branch, or as a pull request set to merge itself.
 - TODO: What ChatGPT support takes. It may need tools named `search` and `fetch` with specific shapes (unverified).
 - TODO: Whether a level without its own instructions falls back to the nearest lower level's. Now it gets only the generic text, so the demo's private level misses the public guidance.
 - TODO: Compare the privacy markup with Obsidian Smart Export's marker syntax before finalizing the markup.
@@ -54,6 +50,10 @@ In order:
 - **Prior art isn't read in depth yet.** The projects listed in [design.md](design.md#prior-art) were judged from READMEs only.
 - **Release is manual.** `nx release` needs `@nx/js`, which breaks the Nx project graph on TypeScript 7. Revisit when Nx supports TypeScript 7, or write custom version actions.
 - **Declarations aren't bundled.** tsdown's declaration bundling needs TypeScript 7.1's API; switch to its `tsgo` generator once 7.1 is stable.
+- **The daily proposal limit and retry check aren't atomic.** R2 has no transactions, so simultaneous calls from one editor can slightly exceed the limit, or queue the same retry twice. Both stay bounded and reach review as separate pull requests.
+- **Verified dates reach the server only at the next publish.** A `current` verdict hides its file from `list_stale` while pending; after the pull acknowledges it, the file shows as due again until a publish ships the new date. Commits pushed with `GITHUB_TOKEN` trigger no workflows, so the proposals workflow publishes itself after pulling.
+- **Edited files are written with LF line endings.** The bundler reads CRLF as LF, so an edit to a CRLF file rewrites all its line endings.
+- **Proposals have no standalone JSON Schema.** Only Kemian's server and CLI exchange them; publish one if another implementation needs them.
 - **The demo's `wrangler.jsonc` holds the author's KV namespace ID.** Wrangler wrote it on the first deploy. Anyone else deploying the demo, or the template made from it, must remove it so Wrangler creates their own.
 
 ## Later

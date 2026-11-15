@@ -8,7 +8,7 @@ Everything ships in this package for now, as separate entry points:
 
 | Entry point                 | What it's for                                                        |
 | --------------------------- | -------------------------------------------------------------------- |
-| `kemian` (CLI)              | Check the privacy markup, build bundles, and publish them            |
+| `kemian` (CLI)              | Check the markup, build and publish bundles, pull agents' proposals  |
 | `@kemian/server/bundler`    | `defineConfig` and the bundler's Promise API                         |
 | `@kemian/server/cloudflare` | The Cloudflare Worker: MCP, publishing, sign-in, and an R2 store     |
 | `@kemian/server/github`     | GitHub sign-in for levels above the anonymous one                    |
@@ -85,3 +85,53 @@ The Worker needs an R2 bucket bound as `BUNDLES`, a KV namespace bound as `OAUTH
 - Private: add `https://<your worker>/mcp?access=private`. The client starts a GitHub login, and only identities listed under a level get in.
 
 The server offers `list`, `read`, and `search` tools, and each level's instructions.
+
+## 5. Let Agents Propose Changes (Optional)
+
+Editors, signed in at the highest level, also get four tools: `note` files a finding in the inbox, `propose_edit` replaces exact snippets of a file, and `list_stale` and `resolve_stale` quiz the author on files due for review. Nothing changes until the author merges a pull request.
+
+Name the editors and keep proposals in the same R2 bucket:
+
+```ts
+import { kemian, r2BundleStore, r2ProposalStore } from '@kemian/server/cloudflare';
+
+export default kemian((env: Env) => ({
+  // …as above
+  editing: {
+    proposals: r2ProposalStore(env.BUNDLES),
+    editors: ['github:12345'],
+    proposalsToken: env.KEMIAN_PROPOSALS_TOKEN,
+  },
+}));
+```
+
+Give files a review interval per `status` in `kemian.config.ts`, e.g. `review: { intervals: { evolving: 30, stable: 180 } }`, and record a `verified: YYYY-MM-DD` date in a file's frontmatter when you confirm it. New notes go in `inbox/` unless `proposals: { notes: '…' }` says otherwise.
+
+Then pull proposals on a schedule. Each becomes a pull request with a `kemian/check` status and what each lower level gains or loses; `current` verdicts are committed straight to the default branch:
+
+```yaml
+on:
+  schedule: [{ cron: '0 * * * *' }]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npx kemian proposals pull --url https://<your worker>
+        env:
+          KEMIAN_PROPOSALS_TOKEN: ${{ secrets.KEMIAN_PROPOSALS_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: git pull --ff-only && npx kemian publish --url https://<your worker>
+        env:
+          KEMIAN_PUBLISH_TOKEN: ${{ secrets.KEMIAN_PUBLISH_TOKEN }}
+```
+
+Allow GitHub Actions to create pull requests in the repository's settings (Actions → General → Workflow permissions). The last step publishes the verified dates, because commits pushed with `GITHUB_TOKEN` don't start other workflows. A pull request whose `kemian/check` fails changes what a level may see, or adds errors: read why before merging it. `kemian proposals pull --dry-run` shows what would happen without writing anything.

@@ -9,7 +9,8 @@ Two levels, `public` and `private`, configured in `knowledge-base/kemian.config.
 - **Folders:** public folders (`about/`, `projects/`) and private ones by default (the root, `journal/`, `meta/`, `sources/`).
 - **Files overriding their folder** in both directions: a private file in a public folder (`about/contact.md`, `projects/atlas.md`) and a public one in a private folder (`journal/highlights.md`).
 - **Markup:** inline spans with and without `alt`, blocks with `reason`, a literal tag in inline and fenced code, and private links in public indexes.
-- **Configuration:** an excluded raw folder (`sources/`, except its README), a draft filtered from the public level (`projects/tidepool.md`), public instructions, kept frontmatter, and URLs.
+- **Configuration:** an excluded raw folder (`sources/`, except its README), a draft filtered from the public level (`projects/tidepool.md`), public instructions, kept frontmatter, URLs, and review intervals for `evolving` and `stable` files.
+- **Review dates:** `journal/highlights.md` was verified long ago, so it's always first in `list_stale`; the other files with a status come due over time, so tests shouldn't assume they aren't due.
 
 The public bundle has 5 files and the private one 14.
 

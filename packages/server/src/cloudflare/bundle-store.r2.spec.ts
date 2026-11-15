@@ -1,35 +1,8 @@
 import { describe, expect, it } from '@effect/vitest';
 
 import { bundleSetOf, publicBundle } from '../../test/bundles.ts';
-import { type R2BucketLike, r2BundleStore } from './bundle-store.r2.ts';
-
-const makeBucket = () => {
-  const objects = new Map<string, string>();
-  const bucket: R2BucketLike = {
-    get: async (key) => {
-      const value = objects.get(key);
-      return value === undefined ? null : { text: async () => value };
-    },
-    put: async (key, value) => {
-      objects.set(key, value);
-    },
-    list: async ({ prefix, cursor }) => {
-      const keys = [...objects.keys()].filter((key) => key.startsWith(prefix)).toSorted();
-      const start = cursor === undefined ? 0 : Number(cursor);
-      const page = keys.slice(start, start + 2);
-      const isTruncated = start + 2 < keys.length;
-      return {
-        objects: page.map((key) => ({ key })),
-        truncated: isTruncated,
-        ...(isTruncated ? { cursor: String(start + 2) } : {}),
-      };
-    },
-    delete: async (keys) => {
-      for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key);
-    },
-  };
-  return { bucket, objects };
-};
+import { r2BundleStore } from './bundle-store.r2.ts';
+import { makeBucket } from './r2-bucket.spec-helper.ts';
 
 describe('r2BundleStore', () => {
   it('starts empty', async () => {
