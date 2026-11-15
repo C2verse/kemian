@@ -35,7 +35,7 @@ Hosts `core` on Cloudflare Workers: the Worker entry point and its routing, a `B
 
 ## Status
 
-**stable**, except the proposal store and routes, which are **working:** tested against the `ProposalStore` contract and in local `workerd` through the demo, not yet deployed. The rest is tested in local `workerd` through the demo, and deployed on Cloudflare with the demo and the first real deployment.
+**stable**, except the proposal store and routes, which are **working:** tested against the `ProposalStore` contract and in local `workerd` through the demo, and deployed on the demo. The rest is tested in local `workerd` through the demo, and deployed on Cloudflare with the demo and the first real deployment.
 
 Known gaps:
 
